@@ -76,7 +76,21 @@ export function toast(message, tone = 'info') {
 // fields: [{ name, label, type, options, required, hint, value, colspan }]
 //   type: text | textarea | date | select | multiselect | readonly
 
-export function openForm({ title, subtitle, fields, values = {}, submitLabel = '저장', onSubmit }) {
+/**
+ * onDelete 를 넘기면 푸터 왼쪽에 삭제 버튼이 생긴다 (수정 모드에서만 넘길 것).
+ * 확인 대화상자는 호출부가 띄운다 — 무엇을 지우는지 아는 쪽이 거기이기 때문이다.
+ * onDelete 가 false 를 돌려주면(사용자가 취소) 폼을 닫지 않는다.
+ */
+export function openForm({
+  title,
+  subtitle,
+  fields,
+  values = {},
+  submitLabel = '저장',
+  onSubmit,
+  onDelete = null,
+  deleteLabel = '삭제',
+}) {
   const backdrop = el('div', 'modal-backdrop');
   const modal = el('div', 'modal');
   modal.setAttribute('role', 'dialog');
@@ -95,8 +109,11 @@ export function openForm({ title, subtitle, fields, values = {}, submitLabel = '
       <div class="form-grid">${fields.map((f) => fieldHtml(f, values[f.name])).join('')}</div>
       <p class="form-error" data-error hidden></p>
       <footer class="modal__foot">
-        <button type="button" class="btn" data-close>취소</button>
-        <button type="submit" class="btn btn--primary">${escapeHtml(submitLabel)}</button>
+        ${onDelete ? `<button type="button" class="btn btn--danger-ghost" data-delete>${escapeHtml(deleteLabel)}</button>` : ''}
+        <div class="modal__foot-actions">
+          <button type="button" class="btn" data-close>취소</button>
+          <button type="submit" class="btn btn--primary">${escapeHtml(submitLabel)}</button>
+        </div>
       </footer>
     </form>
   `;
@@ -123,6 +140,16 @@ export function openForm({ title, subtitle, fields, values = {}, submitLabel = '
     if (e.target === backdrop) close();
   });
   modal.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', close));
+
+  modal.querySelector('[data-delete]')?.addEventListener('click', () => {
+    try {
+      if (onDelete() === false) return; // 호출부의 확인 대화상자에서 취소함
+      close();
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.hidden = false;
+    }
+  });
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();

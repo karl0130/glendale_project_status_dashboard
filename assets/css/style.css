@@ -1401,13 +1401,19 @@ textarea:focus {
   width: 15px;
   height: 15px;
 }
+/* 삭제는 왼쪽 끝, 취소·저장은 오른쪽 — 파괴적 동작을 확인 버튼에서 떼어놓는다. */
 .modal__foot {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
   gap: 10px;
   padding: 14px 20px;
   border-top: 1px solid var(--hairline);
   background: var(--surface-sunken);
+}
+.modal__foot-actions {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
 }
 
 /* ── 툴팁 · 토스트 ───────────────────────────────────────────────────────── */

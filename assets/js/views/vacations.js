@@ -259,6 +259,18 @@ export function openVacationForm(ctx, vacation) {
       { name: 'note', label: '사유 / 비고', type: 'text', colspan: 2 },
     ],
     values: vacation ?? { type: '연차', startDate: toISO(today()), endDate: toISO(today()) },
+    // 수정 모드에서만 삭제 버튼을 붙인다. 새로 신청하는 중에는 지울 대상이 없다.
+    onDelete: vacation
+      ? () => {
+          const who = store.employeeName(vacation.employeeId);
+          const when = fmtRange(vacation.startDate, vacation.endDate);
+          if (!confirmDialog(`${who} · ${vacation.type} (${when}) 일정을 삭제할까요?`)) return false;
+          store.remove('vacations', vacation.id);
+          toast('삭제 완료', 'info');
+          ctx.rerender();
+          return true;
+        }
+      : null,
     onSubmit: (data) => {
       if (data.startDate > data.endDate) throw new Error('종료일이 시작일보다 빠름');
       const clash = store
