@@ -1,0 +1,10 @@
+[
+  { "id": "emp-01", "name": "이정민", "nameEn": "Jungmin Lee", "role": "Managing Partner", "team": "Leadership", "active": true },
+  { "id": "emp-02", "name": "박서준", "nameEn": "Seojun Park", "role": "Principal", "team": "Strategy", "active": true },
+  { "id": "emp-03", "name": "김하늘", "nameEn": "Haneul Kim", "role": "Senior Consultant", "team": "Strategy", "active": true },
+  { "id": "emp-04", "name": "최우진", "nameEn": "Woojin Choi", "role": "Senior Consultant", "team": "Industrial", "active": true },
+  { "id": "emp-05", "name": "정다은", "nameEn": "Daeun Jung", "role": "Consultant", "team": "Strategy", "active": true },
+  { "id": "emp-06", "name": "한지호", "nameEn": "Jiho Han", "role": "Consultant", "team": "Industrial", "active": true },
+  { "id": "emp-07", "name": "오유진", "nameEn": "Yujin Oh", "role": "Associate Consultant", "team": "Strategy", "active": true },
+  { "id": "emp-08", "name": "강민석", "nameEn": "Minseok Kang", "role": "Associate Consultant", "team": "Industrial", "active": true }
+]

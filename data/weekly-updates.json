@@ -1,0 +1,112 @@
+[
+  {
+    "id": "wu-001",
+    "employeeId": "emp-02",
+    "projectId": "prj-001",
+    "task": "고객사 인터뷰 5건 진행 및 시사점 정리",
+    "detail": "반도체사업부 전략기획팀 3명, 신사업개발팀 2명 대상 인터뷰 완료. 내부적으로 후공정 패키징 영역을 우선순위로 보는 시각이 우세함을 확인.",
+    "startDate": "2026-07-27",
+    "endDate": "2026-07-29",
+    "status": "완료"
+  },
+  {
+    "id": "wu-002",
+    "employeeId": "emp-02",
+    "projectId": "prj-001",
+    "task": "중간보고 스토리라인 초안 작성",
+    "detail": "8/14 중간보고용 20p 스토리라인 초안. 파트너 리뷰 반영 후 다음 주 페이지 작업 착수 예정.",
+    "startDate": "2026-07-30",
+    "endDate": "2026-07-31",
+    "status": "진행중"
+  },
+  {
+    "id": "wu-003",
+    "employeeId": "emp-03",
+    "projectId": "prj-001",
+    "task": "글로벌 경쟁사 신사업 포트폴리오 벤치마킹",
+    "detail": "TSMC, Intel Foundry, GlobalFoundries 3개사 최근 3년 신사업 진출 이력 및 투자 규모 정리. 데이터 소스는 각사 IR 및 SEMI 리포트.",
+    "startDate": "2026-07-27",
+    "endDate": "2026-07-30",
+    "status": "완료"
+  },
+  {
+    "id": "wu-004",
+    "employeeId": "emp-03",
+    "projectId": "prj-004",
+    "task": "SK이노베이션 ESG 제안서 작성",
+    "detail": "제안 요청서 요구사항 매핑표 작성 및 수행 방법론 파트 초안. 8/7 제출 목표.",
+    "startDate": "2026-07-30",
+    "endDate": "2026-07-31",
+    "status": "진행중"
+  },
+  {
+    "id": "wu-005",
+    "employeeId": "emp-04",
+    "projectId": "prj-002",
+    "task": "배터리 소재 시장 규모 추정 모델 구축",
+    "detail": "2026-2032 양극재/음극재/전해질 시장 규모 추정. Bottom-up 방식으로 완성차 전동화 계획 기반 수요 산출.",
+    "startDate": "2026-07-27",
+    "endDate": "2026-07-31",
+    "status": "진행중"
+  },
+  {
+    "id": "wu-006",
+    "employeeId": "emp-05",
+    "projectId": "prj-006",
+    "task": "네이버클라우드 킥오프 및 과제 정의",
+    "detail": "7/27 킥오프 미팅 진행. 공공 부문 GTM 범위를 중앙부처/지자체/공공기관 3개 세그먼트로 확정.",
+    "startDate": "2026-07-27",
+    "endDate": "2026-07-28",
+    "status": "완료"
+  },
+  {
+    "id": "wu-007",
+    "employeeId": "emp-05",
+    "projectId": "prj-001",
+    "task": "국내 반도체 소부장 기업 리스트업",
+    "detail": "매출 500억 이상 소부장 기업 62개사 1차 스크리닝. 다음 주 재무 데이터 보강 예정.",
+    "startDate": "2026-07-29",
+    "endDate": "2026-07-31",
+    "status": "진행중"
+  },
+  {
+    "id": "wu-008",
+    "employeeId": "emp-06",
+    "projectId": "prj-002",
+    "task": "해외 소재사 전문가 인터뷰 섭외 및 실시",
+    "detail": "일본 소재사 2곳, 중국 1곳 전문가 네트워크 통해 인터뷰 섭외. 2건 실시 완료.",
+    "startDate": "2026-07-27",
+    "endDate": "2026-07-30",
+    "status": "완료"
+  },
+  {
+    "id": "wu-009",
+    "employeeId": "emp-07",
+    "projectId": "prj-002",
+    "task": "경쟁사 증설 계획 데이터베이스 정리",
+    "detail": "공시/보도자료 기반 주요 15개사 증설 계획 정리. 7/29-31 휴가로 다음 주 마무리 예정.",
+    "startDate": "2026-07-27",
+    "endDate": "2026-07-28",
+    "status": "진행중"
+  },
+  {
+    "id": "wu-010",
+    "employeeId": "emp-08",
+    "projectId": "prj-006",
+    "task": "공공 클라우드 조달 제도 리서치",
+    "detail": "디지털서비스 전문계약제도, 나라장터 조달 절차 및 CSAP 인증 요건 정리.",
+    "startDate": "2026-07-28",
+    "endDate": "2026-07-30",
+    "status": "완료"
+  },
+  {
+    "id": "wu-011",
+    "employeeId": "emp-01",
+    "projectId": "prj-003",
+    "task": "현대모비스 킥오프 준비 및 팀 편성",
+    "detail": "8/3 킥오프 자료 확정. End client(현대자동차) 참석 확정에 따라 어젠다 조정.",
+    "startDate": "2026-07-29",
+    "endDate": "2026-07-31",
+    "status": "진행중"
+  }
+]

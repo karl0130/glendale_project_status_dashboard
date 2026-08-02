@@ -1,0 +1,8 @@
+[
+  { "id": "vac-001", "employeeId": "emp-07", "startDate": "2026-07-29", "endDate": "2026-07-31", "type": "연차", "note": "여름 휴가" },
+  { "id": "vac-002", "employeeId": "emp-08", "startDate": "2026-07-31", "endDate": "2026-07-31", "type": "반차(오후)", "note": "" },
+  { "id": "vac-003", "employeeId": "emp-06", "startDate": "2026-08-03", "endDate": "2026-08-07", "type": "연차", "note": "하계 휴가" },
+  { "id": "vac-004", "employeeId": "emp-03", "startDate": "2026-08-10", "endDate": "2026-08-12", "type": "연차", "note": "" },
+  { "id": "vac-005", "employeeId": "emp-01", "startDate": "2026-08-14", "endDate": "2026-08-14", "type": "경조휴가", "note": "" },
+  { "id": "vac-006", "employeeId": "emp-05", "startDate": "2026-07-30", "endDate": "2026-07-30", "type": "반차(오전)", "note": "건강검진" }
+]
