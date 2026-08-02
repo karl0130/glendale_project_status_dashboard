@@ -8,6 +8,7 @@ import * as projects from './views/projects.js';
 import * as resources from './views/resources.js';
 import * as weekly from './views/weekly.js';
 import * as vacations from './views/vacations.js';
+import * as mypage from './views/mypage.js';
 import * as dataView from './views/data.js';
 
 // 아이콘은 전부 인라인 SVG — 외부 아이콘 폰트나 CDN에 기대지 않는다.
@@ -27,6 +28,8 @@ const ROUTES = [
   { id: 'weekly', label: 'Weekly Work Updates', sub: '주간 업무 보고', render: weekly.render },
   { id: 'vacations', label: '휴가 관리', sub: '휴가 신청 · 일정', render: vacations.render },
   { id: 'data', label: '설정', sub: '시트 연결 · 백업', render: dataView.render },
+  // 사이드바에는 넣지 않는다. 상단 계정 영역의 아이콘으로만 들어간다.
+  { id: 'mypage', label: 'My Page', sub: '내 연차 · 휴가 신청', render: mypage.render },
 ];
 
 const DETAIL_IDS = ['projects', 'resources', 'weekly', 'vacations'];
@@ -120,9 +123,7 @@ function topbar() {
       <span class="brand__divider" aria-hidden="true"></span>
       <h1 class="brand__title">Glendale Korea Project Dashboard</h1>
     </div>
-    <div class="topbar__meta">
-      <span class="topbar__date">${fmtDate(today())}</span>
-    </div>
+    <div class="topbar__meta"></div>
   `;
 
   const meta = bar.querySelector('.topbar__meta');
@@ -150,26 +151,30 @@ function topbar() {
       return bar;
     }
 
-    const chip = el('span', `savestate savestate--${status}`);
-    const text = {
-      idle: '시트 연결됨',
-      saving: '저장 중…',
-      saved: '저장됨',
-      error: '저장 실패',
-    }[status];
-    const tone = { saving: 'warning', saved: 'good', error: 'critical', idle: 'good' }[status];
-    chip.innerHTML = `<span class="dot dot--${tone}" aria-hidden="true"></span>${escapeHtml(text)}`;
-    if (status === 'error') chip.title = message;
-    meta.appendChild(chip);
+    // 평상시(idle)에는 아무것도 띄우지 않는다. 저장 중·실패처럼 사용자가 알아야 할
+    // 순간에만 나타나게 해서 상단을 조용하게 둔다.
+    if (status === 'saving' || status === 'saved' || status === 'error') {
+      const chip = el('span', `savestate savestate--${status}`);
+      const text = { saving: '저장 중…', saved: '저장됨', error: '저장 실패' }[status];
+      const tone = { saving: 'warning', saved: 'good', error: 'critical' }[status];
+      chip.innerHTML = `<span class="dot dot--${tone}" aria-hidden="true"></span>${escapeHtml(text)}`;
+      if (status === 'error') chip.title = message;
+      meta.appendChild(chip);
+    }
 
-    const who = store.account()?.email ?? '';
-    const account = el('button', 'savestate', escapeHtml(who || '로그아웃'));
-    account.title = '클릭하면 연결을 끊습니다 (로컬 저장으로 전환)';
-    account.addEventListener('click', () => {
-      store.disconnect();
-      toast('연결을 끊었습니다. 이제 변경사항은 이 브라우저에만 저장됩니다.', 'info');
-      ctx.rerender();
-    });
+    const me = store.currentEmployee();
+    const pending = store.canApprove(me) ? store.pendingVacations().length : 0;
+
+    const account = el('button', 'account');
+    account.innerHTML = `
+      <span class="account__email">${escapeHtml(store.account()?.email ?? '')}</span>
+      <span class="account__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20.5c0-4 3.4-7.2 7.5-7.2s7.5 3.2 7.5 7.2"/></svg>
+      </span>
+      ${pending ? `<span class="account__badge">${pending}</span>` : ''}
+    `;
+    account.title = pending ? `My Page — 승인 대기 ${pending}건` : 'My Page';
+    account.addEventListener('click', () => ctx.navigate('mypage'));
     meta.appendChild(account);
   } else if (store.sheetStatus() === 'needs-bootstrap') {
     const badge = el(

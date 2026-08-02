@@ -25,8 +25,11 @@ export const GOOGLE = {
 export const SCHEMA = {
   employees: {
     tab: 'employees',
-    columns: ['id', 'name', 'nameEn', 'role', 'team', 'email', 'active'],
-    types: { active: 'boolean' },
+    columns: [
+      'id', 'name', 'nameEn', 'role', 'team', 'email',
+      'joinDate', 'annualLeave', 'canApprove', 'active',
+    ],
+    types: { annualLeave: 'number', canApprove: 'boolean', active: 'boolean' },
   },
   projects: {
     tab: 'projects',
@@ -38,7 +41,10 @@ export const SCHEMA = {
   },
   vacations: {
     tab: 'vacations',
-    columns: ['id', 'employeeId', 'startDate', 'endDate', 'type', 'note'],
+    columns: [
+      'id', 'employeeId', 'startDate', 'endDate', 'type', 'note',
+      'status', 'requestedAt', 'decidedBy', 'decidedAt', 'decisionNote',
+    ],
     types: {},
   },
   weeklyUpdates: {
@@ -50,5 +56,20 @@ export const SCHEMA = {
 
 /** 동시 저장 충돌을 잡기 위한 리비전 칸. */
 export const META = { tab: '_meta', revisionCell: 'B1', savedByCell: 'B2', savedAtCell: 'B3' };
+
+/**
+ * 연차 정책.
+ *
+ * exempt 에 있는 유형은 연차 일수에서 차감하지 않는다.
+ * 반차는 기간과 무관하게 0.5일, 나머지는 주말을 뺀 영업일 수만큼 차감한다.
+ *
+ * 산정 주기는 입사일 기준이다 — 사람마다 갱신 시점이 다르다.
+ * 부여 일수는 employees.annualLeave 로 개인별 관리한다 (비어 있으면 defaultAnnual).
+ */
+export const LEAVE_POLICY = {
+  exempt: ['공가'],
+  halfDayTypes: ['반차(오전)', '반차(오후)'],
+  defaultAnnual: 15,
+};
 
 export const COLLECTIONS = Object.keys(SCHEMA);

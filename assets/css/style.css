@@ -248,6 +248,106 @@ button.savestate:hover {
   cursor: help;
 }
 
+/* 상단 계정 영역 — 클릭하면 My Page. 승인 대기 건수는 여기에 배지로 붙는다. */
+.account {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  padding: 4px 6px 4px 14px;
+  cursor: pointer;
+}
+.account:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.account__icon {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--brand-700);
+}
+.account__icon svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+}
+.account__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--status-critical);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--brand-700);
+}
+
+/* 연차 사용/대기/잔여 한 줄 — 숫자만으로는 비율이 안 잡힌다. */
+.leavebar {
+  padding: 4px 18px 16px;
+}
+.leavebar__track {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--brand-100);
+}
+.leavebar__used {
+  background: var(--brand-450);
+}
+.leavebar__pending {
+  background: repeating-linear-gradient(
+    135deg, var(--status-warning), var(--status-warning) 4px, #ffd270 4px, #ffd270 8px
+  );
+}
+.leavebar__legend {
+  display: flex;
+  gap: 18px;
+  margin-top: 9px;
+}
+.leavebar__key--used { background: var(--brand-450); }
+.leavebar__key--pending { background: var(--status-warning); }
+.leavebar__key--left { background: var(--brand-100); }
+
+/* 미승인 휴가 — 확정된 휴가와 구분되어야 리소스 계획에서 오독하지 않는다.
+   점선은 여기서 "아직 확정 아님"을 뜻한다. 라벨에도 (대기) 를 붙여 색만으로 알리지 않는다. */
+.gbar--vacation-pending {
+  background: repeating-linear-gradient(
+    135deg, #aab4c0, #aab4c0 5px, #bcc5cf 5px, #bcc5cf 10px
+  );
+  outline: 1px dashed var(--ink-secondary);
+  outline-offset: -1px;
+}
+.gbar--vacation-pending .gbar__label {
+  color: #21313f;
+}
+.legend__swatch--vacation-pending {
+  background: repeating-linear-gradient(
+    135deg, #aab4c0, #aab4c0 3px, #bcc5cf 3px, #bcc5cf 6px
+  );
+  outline: 1px dashed var(--ink-muted);
+  outline-offset: -1px;
+}
+
 .dot {
   width: 7px;
   height: 7px;
@@ -563,6 +663,14 @@ textarea:focus {
 }
 
 /* ── KPI 스탯 타일 ───────────────────────────────────────────────────────── */
+
+/* 지표 타일을 가로로 늘어놓는 줄. */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  padding: 14px 18px 4px;
+}
 
 /* 왼쪽에 지표 두 장(세로), 오른쪽에 같은 높이로 금주 휴가. */
 .overview-top {

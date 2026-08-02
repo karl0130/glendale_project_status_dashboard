@@ -119,7 +119,7 @@ function vacationCard(weekStart, weekEnd) {
       type: v.type,
       period: fmtRange(v.startDate, v.endDate),
       days: half ? '0.5일' : `${inWeek.filter((d) => d.getDay() !== 0 && d.getDay() !== 6).length}일`,
-      note: v.note || '—',
+      status: store.vacationStatus(v),
     };
   });
 
@@ -135,12 +135,18 @@ function vacationCard(weekStart, weekEnd) {
   const body = el('div', 'card__body card__body--scroll');
   body.appendChild(
     renderTable(
+      // 사유(비고)는 싣지 않는다. 팀 전체가 보는 화면이다.
       [
         { key: 'name', label: '이름' },
         { key: 'type', label: '휴가 유형' },
         { key: 'period', label: '일정' },
         { key: 'days', label: '영업일', align: 'right' },
-        { key: 'note', label: '비고' },
+        {
+          key: 'status',
+          label: '상태',
+          html: (r) =>
+            `<span class="pill pill--${r.status === '신청' ? 'hold' : 'won'}">${escapeHtml(r.status)}</span>`,
+        },
       ],
       rows,
       '금주 등록된 휴가 없음'
@@ -175,11 +181,12 @@ export function barLabel(p) {
   return weeks ? `${p.name} (${weeks}w)` : p.name;
 }
 
+/** 사유(note)는 넣지 않는다 — 이 툴팁은 팀 전체가 보는 간트에서 뜬다. */
 export function vacationTooltip(name, block) {
   return `<strong>${escapeHtml(name)} — ${escapeHtml(block.type)}</strong>
     <dl class="tooltip__list">
       <dt>기간</dt><dd>${escapeHtml(fmtDate(block.start))}${block.start.getTime() === block.end.getTime() ? '' : ` – ${escapeHtml(fmtDate(block.end))}`}</dd>
-      ${block.note ? `<dt>비고</dt><dd>${escapeHtml(block.note)}</dd>` : ''}
+      ${block.status ? `<dt>상태</dt><dd>${escapeHtml(block.status)}</dd>` : ''}
     </dl>`;
 }
 
@@ -298,8 +305,8 @@ export function buildResourceRows(start, end) {
           start: block.start,
           end: block.end,
           lane,
-          label: block.type,
-          kind: 'vacation',
+          label: block.pending ? `${block.type} (대기)` : block.type,
+          kind: block.pending ? 'vacation-pending' : 'vacation',
           color: 0,
           tooltip: vacationTooltip(emp.name, block),
           aria: `${emp.name} ${block.type}`,
@@ -314,8 +321,8 @@ export function buildResourceRows(start, end) {
           start: v.start,
           end: v.end,
           lane: 0,
-          label: v.type,
-          kind: 'vacation',
+          label: v.pending ? `${v.type} (대기)` : v.type,
+          kind: v.pending ? 'vacation-pending' : 'vacation',
           color: 0,
           tooltip: vacationTooltip(emp.name, v),
           aria: `${emp.name} ${v.type}`,
@@ -394,7 +401,7 @@ export function resourceTable(rows, start, end) {
         role: row.sub,
         kind: '휴가',
         item: v.type,
-        detail: v.note || '—',
+        detail: v.status === '신청' ? '승인 대기' : '승인',
         period: `${fmtDate(v.start)}${v.start.getTime() === v.end.getTime() ? '' : ` – ${fmtDate(v.end)}`}`,
       });
     }

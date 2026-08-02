@@ -37,16 +37,18 @@ export function render(ctx) {
   return view;
 }
 
+// 이 화면은 조회 전용이다. 신청 · 수정 · 삭제는 전부 My Page 에서 한다 —
+// 팀 전체가 보는 화면에서 남의 휴가를 건드릴 수 있으면 안 된다.
 function pageHead(ctx) {
   const head = el('div', 'page-head');
   head.innerHTML = `
     <div>
       <h1 class="page-title">휴가 관리</h1>
-      <p class="page-sub">휴가 신청 및 일정 관리</p>
+      <p class="page-sub">팀 전체 휴가 일정 조회</p>
     </div>
   `;
-  const btn = el('button', 'btn btn--primary', '+ 휴가 신청');
-  btn.addEventListener('click', () => openVacationForm(ctx, null));
+  const btn = el('button', 'btn btn--primary', 'My Page 에서 휴가 신청 →');
+  btn.addEventListener('click', () => ctx.navigate('mypage'));
   head.appendChild(btn);
   return head;
 }
@@ -87,12 +89,11 @@ function monthCard(ctx, start, end) {
       bars: blocks.map((v) => ({
         start: v.start,
         end: v.end,
-        label: v.type,
-        kind: 'vacation',
+        label: v.pending ? `${v.type} (대기)` : v.type,
+        kind: v.pending ? 'vacation-pending' : 'vacation',
         color: 0,
         tooltip: vacationTooltip(emp.name, v),
         aria: `${emp.name} ${v.type}`,
-        onClick: () => openVacationForm(ctx, store.byId('vacations', v.id)),
       })),
     };
   });
@@ -103,7 +104,7 @@ function monthCard(ctx, start, end) {
 
   return chartCard({
     title: `월간 휴가 현황 — ${start.getFullYear()}년 ${start.getMonth() + 1}월`,
-    subtitle: '※차트 내 바 클릭하여 수정·삭제 가능',
+    subtitle: ['※ My page 에서 휴가 신청 · 수정 · 삭제 가능', '점선 바는 승인 대기 중'],
     actions: rangeNav({
       label: `${start.getFullYear()}. ${String(start.getMonth() + 1).padStart(2, '0')}`,
       onPrev: () => {
@@ -128,12 +129,13 @@ function monthCard(ctx, start, end) {
       emptyText: '등록된 인력 없음',
     }),
     table: renderTable(
+      // 사유(비고)는 싣지 않는다. 팀 전체가 보는 화면이라 개인 사정이 드러나면 안 된다.
       [
         { key: 'name', label: '이름' },
+        { key: 'status', label: '상태', html: statusCell },
         { key: 'type', label: '유형' },
         { key: 'period', label: '기간' },
         { key: 'days', label: '영업일', align: 'right' },
-        { key: 'note', label: '비고' },
       ],
       monthList.map(toRow),
       '이 달에 등록된 휴가 없음'
@@ -149,11 +151,18 @@ function toRow(v) {
     name: store.employeeName(v.employeeId),
     role: store.byId('employees', v.employeeId)?.role ?? '',
     type: v.type,
+    status: store.vacationStatus(v),
     period: fmtRange(v.startDate, v.endDate),
     days: half ? '0.5일' : `${eachDay(s, e).filter((d) => !isWeekend(d)).length}일`,
     note: v.note || '—',
     _id: v.id,
   };
+}
+
+const STATUS_TONE = { 신청: 'hold', 승인: 'won', 반려: 'done' };
+
+function statusCell(r) {
+  return `<span class="pill pill--${STATUS_TONE[r.status] ?? 'neutral'}">${escapeHtml(r.status)}</span>`;
 }
 
 function listCard(ctx) {
@@ -167,8 +176,8 @@ function listCard(ctx) {
   card.innerHTML = `
     <header class="card__head">
       <div class="card__titles">
-        <h2 class="card__title">휴가 신청 내역</h2>
-        <p class="card__sub">${list.length}건 · 전체 ${all.length}건</p>
+        <h2 class="card__title">팀 휴가 일정</h2>
+        <p class="card__sub">${list.length}건 · 전체 ${all.length}건 · 신청과 수정은 My Page 에서</p>
       </div>
     </header>
   `;
@@ -192,34 +201,14 @@ function listCard(ctx) {
     [
       { key: 'name', label: '이름' },
       { key: 'role', label: '직책' },
+      { key: 'status', label: '상태', html: statusCell },
       { key: 'type', label: '유형' },
       { key: 'period', label: '기간' },
       { key: 'days', label: '영업일', align: 'right' },
-      { key: 'note', label: '비고' },
-      {
-        key: 'actions',
-        label: '',
-        align: 'right',
-        html: (r) => `<span class="rowactions">
-          <button type="button" class="link-btn" data-edit="${r._id}">수정</button>
-          <button type="button" class="link-btn link-btn--danger" data-del="${r._id}">삭제</button>
-        </span>`,
-      },
     ],
     list.map(toRow),
     scope === 'upcoming' ? '예정된 휴가 없음' : '등록된 휴가 없음'
   );
-
-  table.addEventListener('click', (e) => {
-    const edit = e.target.closest('[data-edit]');
-    const del = e.target.closest('[data-del]');
-    if (edit) openVacationForm(ctx, store.byId('vacations', edit.dataset.edit));
-    if (del && confirmDialog('이 휴가 일정을 삭제할까요?')) {
-      store.remove('vacations', del.dataset.del);
-      toast('삭제 완료', 'info');
-      ctx.rerender();
-    }
-  });
 
   const body = el('div', 'card__body');
   body.appendChild(table);
@@ -227,11 +216,16 @@ function listCard(ctx) {
   return card;
 }
 
-export function openVacationForm(ctx, vacation) {
+export function openVacationForm(ctx, vacation, { employeeId = '' } = {}) {
   const isNew = !vacation;
+  const me = store.currentEmployee();
+  const preset = vacation?.employeeId || employeeId || me?.id || '';
+
   openForm({
     title: isNew ? '휴가 신청' : '휴가 수정',
-    subtitle: '등록 즉시 Overview와 Resource Planning에 반영',
+    subtitle: store.canApprove(me)
+      ? '승인권자 계정 — 신청 없이 바로 승인 처리됨'
+      : '신청 후 승인권자의 승인이 필요',
     submitLabel: isNew ? '신청' : '저장',
     fields: [
       {
@@ -258,7 +252,12 @@ export function openVacationForm(ctx, vacation) {
       },
       { name: 'note', label: '사유 / 비고', type: 'text', colspan: 2 },
     ],
-    values: vacation ?? { type: '연차', startDate: toISO(today()), endDate: toISO(today()) },
+    values: vacation ?? {
+      employeeId: preset,
+      type: '연차',
+      startDate: toISO(today()),
+      endDate: toISO(today()),
+    },
     // 수정 모드에서만 삭제 버튼을 붙인다. 새로 신청하는 중에는 지울 대상이 없다.
     onDelete: vacation
       ? () => {
@@ -285,9 +284,28 @@ export function openVacationForm(ctx, vacation) {
       if (clash) {
         throw new Error(`이미 등록된 휴가와 겹침 — ${fmtRange(clash.startDate, clash.endDate)} ${clash.type}`);
       }
-      store.upsert('vacations', { id: vacation?.id ?? uid('vac'), ...data });
+      // 승인권자가 올리는 건은 승인 단계를 거치지 않는다.
+      // 수정일 때는 기존 상태를 유지한다 — 승인된 건을 고쳤다고 다시 대기로 돌리지 않는다.
+      const applicant = store.byId('employees', data.employeeId);
+      const autoApprove = store.canApprove(applicant) || store.canApprove(me);
+      const status = vacation ? store.vacationStatus(vacation) : autoApprove ? '승인' : '신청';
+      const stamp = toISO(today());
+
+      store.upsert('vacations', {
+        id: vacation?.id ?? uid('vac'),
+        ...data,
+        status,
+        requestedAt: vacation?.requestedAt || stamp,
+        decidedBy: vacation?.decidedBy ?? (status === '승인' ? me?.id ?? applicant?.id ?? '' : ''),
+        decidedAt: vacation?.decidedAt ?? (status === '승인' ? stamp : ''),
+        decisionNote: vacation?.decisionNote ?? '',
+      });
+
       anchor = startOfMonth(parseDate(data.startDate)); // 신청한 달로 화면을 옮긴다
-      toast(isNew ? '휴가 신청 완료' : '저장 완료', 'good');
+      toast(
+        isNew ? (status === '승인' ? '휴가 등록 완료' : '휴가 신청 완료 — 승인 대기') : '저장 완료',
+        'good'
+      );
       ctx.rerender();
     },
   });

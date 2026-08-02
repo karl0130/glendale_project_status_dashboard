@@ -10,8 +10,8 @@
 
 import * as auth from './google/auth.js';
 import * as sheets from './google/sheets.js';
-import { COLLECTIONS } from './config.js';
-import { byKo, parseDate, toISO, today } from './util.js';
+import { COLLECTIONS, LEAVE_POLICY } from './config.js';
+import { byKo, parseDate, toISO, today, workdayCount } from './util.js';
 
 const SOURCES = {
   employees: 'data/employees.json',
@@ -363,9 +363,112 @@ export function projectsInRange(start, end, statuses = null) {
   });
 }
 
-/** 특정 기간에 걸치는 휴가 */
+// ── 휴가 승인 · 연차 ────────────────────────────────────────────────────────
+
+export const VACATION_STATUSES = ['신청', '승인', '반려'];
+
+/** 상태가 비어 있는 옛 기록은 이미 확정된 일정으로 본다. */
+export function vacationStatus(v) {
+  return v?.status || '승인';
+}
+
+/** 승인 여부와 무관하게 일정으로 잡힌 것 (반려만 제외). */
+function isScheduled(v) {
+  return vacationStatus(v) !== '반려';
+}
+
+export function canApprove(employee) {
+  return Boolean(employee?.canApprove);
+}
+
+/** 이 사람의 휴가를 승인 없이 바로 확정해도 되는가 (승인권자 본인). */
+export function selfApproves(employee) {
+  return canApprove(employee);
+}
+
+/**
+ * 이 휴가가 연차에서 깎는 일수.
+ * 공가 등 면제 유형은 0, 반차는 기간과 무관하게 0.5, 나머지는 영업일 수.
+ */
+export function leaveCost(v) {
+  if (LEAVE_POLICY.exempt.includes(v.type)) return 0;
+  if (LEAVE_POLICY.halfDayTypes.includes(v.type)) return 0.5;
+  const s = parseDate(v.startDate);
+  const e = parseDate(v.endDate);
+  if (!s || !e || e < s) return 0;
+  return workdayCount(s, e);
+}
+
+/**
+ * 입사일 기준 현재 연차 산정 기간. 사람마다 갱신 시점이 다르다.
+ * 입사일이 없으면 회계연도(1/1~12/31)로 대체한다.
+ */
+export function leaveYear(employee, ref = today()) {
+  const join = parseDate(employee?.joinDate);
+  if (!join) {
+    return { start: new Date(ref.getFullYear(), 0, 1), end: new Date(ref.getFullYear(), 11, 31) };
+  }
+  let start = new Date(ref.getFullYear(), join.getMonth(), join.getDate());
+  if (start > ref) start = new Date(ref.getFullYear() - 1, join.getMonth(), join.getDate());
+  const end = new Date(start.getFullYear() + 1, start.getMonth(), start.getDate() - 1);
+  return { start, end };
+}
+
+/**
+ * 연차 잔여 현황.
+ * 승인분과 대기분을 따로 센다 — 대기분만 보고 있으면 반려됐을 때 되돌려야 하고,
+ * 승인분만 보면 신청해둔 것을 잊고 초과 신청하게 된다.
+ */
+export function leaveBalance(employeeId, ref = today()) {
+  const emp = byId('employees', employeeId);
+  const total = emp?.annualLeave ?? LEAVE_POLICY.defaultAnnual;
+  const period = leaveYear(emp, ref);
+
+  const mine = all('vacations').filter((v) => {
+    if (v.employeeId !== employeeId) return false;
+    const s = parseDate(v.startDate);
+    return s && s >= period.start && s <= period.end;
+  });
+
+  const sum = (rows) => rows.reduce((acc, v) => acc + leaveCost(v), 0);
+  const used = sum(mine.filter((v) => vacationStatus(v) === '승인'));
+  const pendingDays = sum(mine.filter((v) => vacationStatus(v) === '신청'));
+  const exempt = sum(mine.filter((v) => LEAVE_POLICY.exempt.includes(v.type))); // 항상 0
+  void exempt;
+
+  return {
+    total,
+    used,
+    pending: pendingDays,
+    remaining: Math.max(0, total - used - pendingDays),
+    period,
+    records: mine,
+  };
+}
+
+/** 승인 대기 중인 전체 신청 (승인권자 화면용). */
+export function pendingVacations() {
+  return all('vacations')
+    .filter((v) => vacationStatus(v) === '신청')
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+}
+
+export function decideVacation(id, decision, decidedByEmployeeId, note = '') {
+  const v = byId('vacations', id);
+  if (!v) throw new Error('휴가 기록을 찾을 수 없습니다');
+  upsert('vacations', {
+    ...v,
+    status: decision,
+    decidedBy: decidedByEmployeeId ?? '',
+    decidedAt: toISO(today()),
+    decisionNote: note,
+  });
+}
+
+/** 특정 기간에 걸치는 휴가 (반려된 건 일정에서 뺀다) */
 export function vacationsInRange(start, end) {
   return all('vacations').filter((v) => {
+    if (!isScheduled(v)) return false;
     const s = parseDate(v.startDate);
     const e = parseDate(v.endDate);
     return s && e && s <= end && start <= e;
@@ -378,13 +481,15 @@ export function vacationsInRange(start, end) {
  */
 export function vacationBlocks(employeeId) {
   return all('vacations')
-    .filter((v) => v.employeeId === employeeId)
+    .filter((v) => v.employeeId === employeeId && isScheduled(v))
     .map((v) => ({
       id: v.id,
       start: parseDate(v.startDate),
       end: parseDate(v.endDate),
       type: v.type,
       note: v.note ?? '',
+      status: vacationStatus(v),
+      pending: vacationStatus(v) === '신청',
     }))
     .filter((v) => v.start && v.end)
     .sort((a, b) => a.start - b.start);

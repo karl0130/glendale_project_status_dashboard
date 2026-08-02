@@ -1,8 +1,10 @@
 [
-  { "id": "vac-001", "employeeId": "emp-07", "startDate": "2026-07-29", "endDate": "2026-07-31", "type": "연차", "note": "여름 휴가" },
-  { "id": "vac-002", "employeeId": "emp-08", "startDate": "2026-07-31", "endDate": "2026-07-31", "type": "반차(오후)", "note": "" },
-  { "id": "vac-003", "employeeId": "emp-06", "startDate": "2026-08-03", "endDate": "2026-08-07", "type": "연차", "note": "하계 휴가" },
-  { "id": "vac-004", "employeeId": "emp-03", "startDate": "2026-08-10", "endDate": "2026-08-12", "type": "연차", "note": "" },
-  { "id": "vac-005", "employeeId": "emp-01", "startDate": "2026-08-14", "endDate": "2026-08-14", "type": "경조휴가", "note": "" },
-  { "id": "vac-006", "employeeId": "emp-05", "startDate": "2026-07-30", "endDate": "2026-07-30", "type": "반차(오전)", "note": "건강검진" }
+  { "id": "vac-001", "employeeId": "emp-07", "startDate": "2026-07-29", "endDate": "2026-07-31", "type": "연차", "note": "여름 휴가", "status": "승인", "requestedAt": "2026-07-20", "decidedBy": "emp-01", "decidedAt": "2026-07-21", "decisionNote": "" },
+  { "id": "vac-002", "employeeId": "emp-08", "startDate": "2026-07-31", "endDate": "2026-07-31", "type": "반차(오후)", "note": "", "status": "승인", "requestedAt": "2026-07-28", "decidedBy": "emp-01", "decidedAt": "2026-07-28", "decisionNote": "" },
+  { "id": "vac-003", "employeeId": "emp-06", "startDate": "2026-08-03", "endDate": "2026-08-07", "type": "연차", "note": "하계 휴가", "status": "승인", "requestedAt": "2026-07-15", "decidedBy": "emp-01", "decidedAt": "2026-07-16", "decisionNote": "" },
+  { "id": "vac-004", "employeeId": "emp-03", "startDate": "2026-08-10", "endDate": "2026-08-12", "type": "연차", "note": "", "status": "신청", "requestedAt": "2026-08-01", "decidedBy": "", "decidedAt": "", "decisionNote": "" },
+  { "id": "vac-005", "employeeId": "emp-01", "startDate": "2026-08-14", "endDate": "2026-08-14", "type": "경조휴가", "note": "", "status": "승인", "requestedAt": "2026-07-30", "decidedBy": "emp-01", "decidedAt": "2026-07-30", "decisionNote": "" },
+  { "id": "vac-006", "employeeId": "emp-05", "startDate": "2026-07-30", "endDate": "2026-07-30", "type": "반차(오전)", "note": "건강검진", "status": "승인", "requestedAt": "2026-07-27", "decidedBy": "emp-01", "decidedAt": "2026-07-27", "decisionNote": "" },
+  { "id": "vac-007", "employeeId": "emp-05", "startDate": "2026-08-24", "endDate": "2026-08-25", "type": "연차", "note": "개인 사유", "status": "신청", "requestedAt": "2026-08-02", "decidedBy": "", "decidedAt": "", "decisionNote": "" },
+  { "id": "vac-008", "employeeId": "emp-04", "startDate": "2026-08-19", "endDate": "2026-08-19", "type": "공가", "note": "예비군 훈련", "status": "신청", "requestedAt": "2026-08-01", "decidedBy": "", "decidedAt": "", "decisionNote": "" }
 ]

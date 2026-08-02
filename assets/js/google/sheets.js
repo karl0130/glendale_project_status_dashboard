@@ -49,6 +49,9 @@ function decode(schema, column, raw) {
       // 그걸 거짓으로 읽으면 직원이 아무 경고 없이 화면에서 사라진다.
       // 끄고 싶으면 FALSE 를 명시적으로 적어야 한다.
       return !/^(false|f|no|n|0)$/i.test(value);
+    case 'number':
+      // 빈 칸은 0 이 아니라 null. "값 없음"과 "0" 을 구분해야 기본값을 적용할 수 있다.
+      return value === '' ? null : Number(value.replace(/,/g, '')) || 0;
     default:
       return value;
   }
@@ -60,6 +63,8 @@ function encode(schema, column, value) {
       return (value ?? []).join(',');
     case 'boolean':
       return value === false ? 'FALSE' : 'TRUE';
+    case 'number':
+      return value == null || value === '' ? '' : String(value);
     default:
       return value == null ? '' : String(value);
   }
