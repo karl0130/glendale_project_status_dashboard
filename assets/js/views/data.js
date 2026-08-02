@@ -5,6 +5,7 @@
 // 그리고 그 커밋 이력 자체가 아카이브가 된다.
 
 import * as store from '../store.js';
+import { GOOGLE } from '../config.js';
 import { confirmDialog, el, openForm, toast } from '../ui.js';
 import { escapeHtml, fmtDate, today, toISO } from '../util.js';
 
@@ -16,12 +17,49 @@ const COLLECTIONS = [
 ];
 
 export function render(ctx) {
+  const connected = store.source() === 'sheets';
   const view = el('div', 'view__inner');
   view.appendChild(pageHead());
   view.appendChild(connectionCard(ctx));
-  view.appendChild(syncCard(ctx));
-  view.appendChild(archiveCard());
+  // 시트에 연결되면 data/*.json 은 더 이상 저장 경로가 아니다.
+  // 내보내기-커밋 흐름을 그대로 두면 실제 데이터를 공개 레포에 올리게 된다.
+  view.appendChild(connected ? repoFilesCard() : syncCard(ctx));
+  view.appendChild(archiveCard(connected));
   return view;
+}
+
+// ── 시트 연결 후: 레포 JSON 의 역할 안내 ────────────────────────────────────
+
+function repoFilesCard() {
+  const card = el('section', 'card');
+  card.innerHTML = `
+    <header class="card__head">
+      <div class="card__titles">
+        <h2 class="card__title">레포의 <code>data/*.json</code></h2>
+        <p class="card__sub">지금은 저장 경로가 아님 · 로그인 전에 보이는 표본 데이터</p>
+      </div>
+    </header>
+  `;
+  const body = el('div', 'card__body');
+  body.appendChild(
+    el(
+      'p',
+      'callout callout--warning',
+      '<strong>시트의 실제 데이터를 이 파일들에 커밋하지 말 것</strong><br>' +
+        '<code>data/</code> 는 GitHub Pages 로 그대로 공개되므로, 커밋하는 순간 고객사명과 인력 배치가 ' +
+        'URL 아는 사람 누구에게나 보인다. 백업이 필요하면 아래 스냅샷을 쓸 것'
+    )
+  );
+  body.appendChild(
+    el(
+      'p',
+      'callout',
+      '이 파일들은 <strong>로그인하지 않은 사람에게 보이는 화면</strong>을 채우는 용도로만 남아 있다. ' +
+        '표본 데이터로 두는 것이 맞다'
+    )
+  );
+  card.appendChild(body);
+  return card;
 }
 
 // ── 구글 시트 연결 ──────────────────────────────────────────────────────────
@@ -228,7 +266,7 @@ function syncCard(ctx) {
 
 // ── 아카이브 ────────────────────────────────────────────────────────────────
 
-function archiveCard() {
+function archiveCard(connected) {
   const card = el('section', 'card');
   card.innerHTML = `
     <header class="card__head">
@@ -243,9 +281,22 @@ function archiveCard() {
     el(
       'p',
       'callout',
-      '일상적인 아카이빙은 <strong>git 커밋 이력이 대신함</strong> · <code>data/</code> 를 커밋해두면 "8월 1일 시점의 프로젝트 현황"을 언제든 복원 가능<br>아래 스냅샷은 월말 보고처럼 파일 하나로 남겨야 할 때만 사용'
+      connected
+        ? '일상적인 이력은 <strong>구글 시트의 버전 기록이 대신함</strong> · 시트에서 ' +
+            '<code>파일 → 버전 기록 → 버전 기록 보기</code> 로 언제든 되돌리기 가능<br>' +
+            '아래 스냅샷은 월말 보고용 파일이나 구글 밖 백업이 필요할 때 사용'
+        : '<code>data/</code> 를 커밋해두면 git 이력이 그대로 시점별 기록이 됨<br>' +
+            '아래 스냅샷은 월말 보고처럼 파일 하나로 남겨야 할 때만 사용'
     )
   );
+
+  if (connected) {
+    const link = el('p', 'callout');
+    link.innerHTML =
+      `<a href="https://docs.google.com/spreadsheets/d/${escapeHtml(GOOGLE.spreadsheetId)}/edit" ` +
+      'target="_blank" rel="noopener"><strong>스프레드시트 열기 →</strong></a> · 원본 데이터와 버전 기록';
+    body.appendChild(link);
+  }
 
   const btn = el('button', 'btn btn--primary', `${fmtDate(today())} 스냅샷 내려받기`);
   btn.addEventListener('click', () => {
