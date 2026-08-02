@@ -45,7 +45,10 @@ function decode(schema, column, raw) {
     case 'list':
       return value ? value.split(',').map((s) => s.trim()).filter(Boolean) : [];
     case 'boolean':
-      return !/^(false|f|no|n|0|)$/i.test(value);
+      // 빈 칸은 참으로 본다. 사람이 손으로 채우는 시트에서 칸을 비워두는 건 흔한 일인데,
+      // 그걸 거짓으로 읽으면 직원이 아무 경고 없이 화면에서 사라진다.
+      // 끄고 싶으면 FALSE 를 명시적으로 적어야 한다.
+      return !/^(false|f|no|n|0)$/i.test(value);
     default:
       return value;
   }
