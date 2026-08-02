@@ -206,8 +206,8 @@ pip install holidays && python scripts/gen_holidays.py
 | 부여 일수 | `employees.annualLeave` (개인별). 비어 있으면 15일 |
 | 산정 기간 | **입사일 기준** 1년. `employees.joinDate` 가 비어 있으면 회계연도(1/1–12/31) |
 | 반차 | 기간과 무관하게 **0.5일** |
-| 연차 · 경조휴가 · 기타 | **주말과 공휴일을 뺀** 영업일 수만큼 차감 |
-| 공가 | **차감하지 않음** (`config.js` 의 `LEAVE_POLICY.exempt`) |
+| 연차 · 기타 | **주말과 공휴일을 뺀** 영업일 수만큼 차감 |
+| 공가 · 경조휴가 | **차감하지 않음** (`config.js` 의 `LEAVE_POLICY.exempt`) |
 
 `잔여 = 부여 − 승인분 − 대기분`. 대기분을 미리 빼두지 않으면 신청해둔 것을 잊고
 초과 신청하게 되고, 대기분만 빼면 반려됐을 때 되돌려야 한다. 그래서 둘 다 표시한다.

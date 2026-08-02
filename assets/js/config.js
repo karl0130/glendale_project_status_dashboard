@@ -67,7 +67,7 @@ export const META = { tab: '_meta', revisionCell: 'B1', savedByCell: 'B2', saved
  * 부여 일수는 employees.annualLeave 로 개인별 관리한다 (비어 있으면 defaultAnnual).
  */
 export const LEAVE_POLICY = {
-  exempt: ['공가'],
+  exempt: ['공가', '경조휴가'],
   halfDayTypes: ['반차(오전)', '반차(오후)'],
   defaultAnnual: 15,
 };

@@ -4,6 +4,7 @@
 // email 이 비어 있으면 여기서 막히므로 그 사실을 분명히 알려준다.
 
 import * as store from '../store.js';
+import { LEAVE_POLICY } from '../config.js';
 import { renderTable } from '../gantt.js';
 import { confirmDialog, el, openForm, toast } from '../ui.js';
 import { escapeHtml, fmtDate, fmtRange, parseDate } from '../util.js';
@@ -85,8 +86,8 @@ function approvalCard(ctx, me) {
       { key: 'name', label: '신청자' },
       { key: 'type', label: '유형' },
       { key: 'period', label: '기간' },
-      { key: 'days', label: '차감', align: 'right' },
-      { key: 'remaining', label: '승인 후 잔여', align: 'right' },
+      { key: 'days', label: '차감' },
+      { key: 'remaining', label: '승인 후 잔여' },
       { key: 'note', label: '사유' },
       {
         key: 'actions',
@@ -209,8 +210,14 @@ function balanceCard(me) {
   `;
   body.appendChild(meter);
 
+  // 면제 유형은 정책에서 그대로 읽는다. 문구를 손으로 적어두면 정책이 바뀔 때 어긋난다.
   body.appendChild(
-    el('p', 'callout', '<strong>공가</strong>는 연차에서 차감되지 않음 · <strong>반차</strong>는 0.5일로 계산')
+    el(
+      'p',
+      'callout',
+      `<strong>${LEAVE_POLICY.exempt.map(escapeHtml).join(' · ')}</strong>는 연차에서 차감되지 않음 · ` +
+        '<strong>반차</strong>는 0.5일 · 주말과 공휴일은 제외하고 계산'
+    )
   );
 
   card.appendChild(body);
@@ -245,7 +252,7 @@ function myVacationsCard(ctx, me) {
       },
       { key: 'type', label: '유형' },
       { key: 'period', label: '기간' },
-      { key: 'days', label: '차감', align: 'right' },
+      { key: 'days', label: '차감' },
       { key: 'note', label: '사유' },
       { key: 'decision', label: '처리' },
       {
