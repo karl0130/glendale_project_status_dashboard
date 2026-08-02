@@ -17,7 +17,7 @@ const ICONS = {
   resources: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20.5c0-3.4 2.7-6.2 6-6.2s6 2.8 6 6.2"/><circle cx="17.5" cy="9.5" r="2.4"/><path d="M16.6 14.6c2.6.5 4.4 2.9 4.4 5.9"/>',
   weekly: '<rect x="3" y="5" width="18" height="16" rx="2.2"/><path d="M8 3v4M16 3v4M3 10.5h18"/><path d="M9 15.5l2 2 4-4"/>',
   vacations: '<circle cx="12" cy="12" r="3.8"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/>',
-  data: '<rect x="3" y="4" width="18" height="5" rx="1.6"/><path d="M5 9.5v9.6A1.9 1.9 0 006.9 21h10.2a1.9 1.9 0 001.9-1.9V9.5"/><path d="M10 13.5h4"/>',
+  data: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1A1.7 1.7 0 008 19.3a1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H2a2 2 0 110-4h.1A1.7 1.7 0 003.7 8a1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H8a1.7 1.7 0 001-1.5V2a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V8a1.7 1.7 0 001.5 1H22a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>',
 };
 
 const ROUTES = [
@@ -26,7 +26,7 @@ const ROUTES = [
   { id: 'resources', label: 'Resource Planning', sub: '인력 투입 현황', render: resources.render },
   { id: 'weekly', label: 'Weekly Work Updates', sub: '주간 업무 보고', render: weekly.render },
   { id: 'vacations', label: '휴가 관리', sub: '휴가 신청 · 일정', render: vacations.render },
-  { id: 'data', label: '데이터 & 아카이브', sub: '반영 · 백업', render: dataView.render },
+  { id: 'data', label: '설정', sub: '시트 연결 · 백업', render: dataView.render },
 ];
 
 const DETAIL_IDS = ['projects', 'resources', 'weekly', 'vacations'];

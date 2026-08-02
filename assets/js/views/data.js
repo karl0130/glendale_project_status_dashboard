@@ -1,65 +1,33 @@
-// 데이터 & 아카이브.
+// 설정 — 구글 시트 연결과 백업.
 //
-// 이 화면이 "저장 버튼"의 역할을 한다. 서버가 없으므로 브라우저의 입력은
-// 자동으로 공유되지 않는다 — 내보낸 JSON을 data/ 아래에 커밋해야 팀 전체에 반영된다.
-// 그리고 그 커밋 이력 자체가 아카이브가 된다.
+// 시트가 원본이 된 뒤로 이 화면이 할 일은 셋뿐이다: 연결 상태 확인, 최신 내용 다시 받기,
+// 백업 받기. 예전에 있던 "JSON 내보내서 레포에 커밋" 흐름은 시트 연결 상태에서는
+// 실제 데이터를 공개 레포에 올리는 길이라 아예 걷어냈다.
 
 import * as store from '../store.js';
 import { GOOGLE } from '../config.js';
-import { confirmDialog, el, openForm, toast } from '../ui.js';
+import { confirmDialog, el, toast } from '../ui.js';
 import { escapeHtml, fmtDate, today, toISO } from '../util.js';
 
-const COLLECTIONS = [
-  { key: 'projects', label: '프로젝트', desc: 'Project Status 입력값' },
-  { key: 'weeklyUpdates', label: '주간 업무', desc: 'Weekly Work Updates 입력값' },
-  { key: 'vacations', label: '휴가', desc: '휴가 관리 입력값' },
-  { key: 'employees', label: '인력', desc: '구성원 명단' },
-];
+const SHEET_URL = `https://docs.google.com/spreadsheets/d/${GOOGLE.spreadsheetId}/edit`;
 
 export function render(ctx) {
-  const connected = store.source() === 'sheets';
   const view = el('div', 'view__inner');
   view.appendChild(pageHead());
   view.appendChild(connectionCard(ctx));
-  // 시트에 연결되면 data/*.json 은 더 이상 저장 경로가 아니다.
-  // 내보내기-커밋 흐름을 그대로 두면 실제 데이터를 공개 레포에 올리게 된다.
-  view.appendChild(connected ? repoFilesCard() : syncCard(ctx));
-  view.appendChild(archiveCard(connected));
+  view.appendChild(backupCard());
   return view;
 }
 
-// ── 시트 연결 후: 레포 JSON 의 역할 안내 ────────────────────────────────────
-
-function repoFilesCard() {
-  const card = el('section', 'card');
-  card.innerHTML = `
-    <header class="card__head">
-      <div class="card__titles">
-        <h2 class="card__title">레포의 <code>data/*.json</code></h2>
-        <p class="card__sub">지금은 저장 경로가 아님 · 로그인 전에 보이는 표본 데이터</p>
-      </div>
-    </header>
+function pageHead() {
+  const head = el('div', 'page-head');
+  head.innerHTML = `
+    <div>
+      <h1 class="page-title">설정</h1>
+      <p class="page-sub">구글 시트 연결 및 백업</p>
+    </div>
   `;
-  const body = el('div', 'card__body');
-  body.appendChild(
-    el(
-      'p',
-      'callout callout--warning',
-      '<strong>시트의 실제 데이터를 이 파일들에 커밋하지 말 것</strong><br>' +
-        '<code>data/</code> 는 GitHub Pages 로 그대로 공개되므로, 커밋하는 순간 고객사명과 인력 배치가 ' +
-        'URL 아는 사람 누구에게나 보인다. 백업이 필요하면 아래 스냅샷을 쓸 것'
-    )
-  );
-  body.appendChild(
-    el(
-      'p',
-      'callout',
-      '이 파일들은 <strong>로그인하지 않은 사람에게 보이는 화면</strong>을 채우는 용도로만 남아 있다. ' +
-        '표본 데이터로 두는 것이 맞다'
-    )
-  );
-  card.appendChild(body);
-  return card;
+  return head;
 }
 
 // ── 구글 시트 연결 ──────────────────────────────────────────────────────────
@@ -71,7 +39,7 @@ function connectionCard(ctx) {
     <header class="card__head">
       <div class="card__titles">
         <h2 class="card__title">구글 시트 연결</h2>
-        <p class="card__sub">연결하면 입력이 즉시 팀 전체에 반영</p>
+        <p class="card__sub">데이터 원본 · 저장 즉시 팀 전체에 반영</p>
       </div>
     </header>
   `;
@@ -107,11 +75,18 @@ function connectionCard(ctx) {
         'p',
         'callout',
         `<strong>연결됨</strong> · ${escapeHtml(store.account()?.email ?? '')} · 리비전 ${store.revision()}<br>` +
-          '모든 입력이 구글 시트에 바로 저장되고 팀원 화면에도 반영'
+          '모든 입력이 시트에 바로 저장되고 팀원 화면에도 반영'
       )
     );
 
-    const refresh = el('button', 'btn', '시트에서 다시 불러오기');
+    const open = el('a', 'btn btn--primary', '스프레드시트 열기 ↗');
+    open.href = SHEET_URL;
+    open.target = '_blank';
+    open.rel = 'noopener';
+    actions.appendChild(open);
+
+    const refresh = el('button', 'btn', '최신 내용 다시 받기');
+    refresh.title = '다른 사람이 저장한 내용을 지금 반영합니다';
     refresh.addEventListener('click', async () => {
       try {
         await store.pull();
@@ -146,8 +121,8 @@ function connectionCard(ctx) {
       el(
         'p',
         'callout callout--warning',
-        '<strong>연결 안 됨</strong> · 지금 입력하는 내용은 이 브라우저에만 저장되고 공유되지 않음<br>' +
-          '우측 상단 <strong>구글 로그인</strong> 버튼으로 연결'
+        '<strong>연결 안 됨</strong> · 지금 보이는 것은 <code>data/*.json</code> 의 표본 데이터이고, ' +
+          '입력해도 이 브라우저에만 남는다<br>실제 데이터를 보려면 로그인이 필요'
       )
     );
     const signIn = el('button', 'btn btn--primary', '구글 로그인하고 연결');
@@ -160,119 +135,16 @@ function connectionCard(ctx) {
   return card;
 }
 
-function pageHead() {
-  const head = el('div', 'page-head');
-  head.innerHTML = `
-    <div>
-      <h1 class="page-title">데이터 &amp; 아카이브</h1>
-      <p class="page-sub">대시보드 데이터 관리 및 아카이브</p>
-    </div>
-  `;
-  return head;
-}
+// ── 백업 ────────────────────────────────────────────────────────────────────
 
-// ── 반영(내보내기) ──────────────────────────────────────────────────────────
-
-function syncCard(ctx) {
-  const changed = store.changedCollections();
+function backupCard() {
+  const connected = store.source() === 'sheets';
   const card = el('section', 'card');
   card.innerHTML = `
     <header class="card__head">
       <div class="card__titles">
-        <h2 class="card__title">변경사항 반영</h2>
-        <p class="card__sub">브라우저에 저장된 변경을 레포의 <code>data/</code> 파일로 이관</p>
-      </div>
-    </header>
-  `;
-
-  const body = el('div', 'card__body');
-  body.appendChild(
-    el(
-      'p',
-      `callout${changed.length ? ' callout--warning' : ''}`,
-      changed.length
-        ? `<strong>이 브라우저에만 저장된 변경 ${changed.length}건</strong> · 해당 파일을 내려받아 <code>data/</code> 에 덮어쓰고 커밋해야 팀에 반영`
-        : '레포에 커밋된 데이터와 동일'
-    )
-  );
-
-  const list = el('div', 'sync-list');
-  for (const col of COLLECTIONS) {
-    const isChanged = changed.includes(col.key);
-    const row = el('div', `sync-row${isChanged ? ' is-changed' : ''}`);
-    row.innerHTML = `
-      <div class="sync-row__meta">
-        <span class="sync-row__name">${escapeHtml(col.label)}
-          <code>data/${store.FILENAMES[col.key]}</code>
-        </span>
-        <span class="sync-row__desc">${escapeHtml(col.desc)} · ${store.all(col.key).length}건
-          ${isChanged ? '<span class="pill pill--hold">변경됨</span>' : '<span class="pill pill--neutral">동일</span>'}
-        </span>
-      </div>
-      <div class="sync-row__actions">
-        <button type="button" class="btn btn--ghost" data-copy="${col.key}">복사</button>
-        <button type="button" class="btn" data-download="${col.key}">내려받기</button>
-        <button type="button" class="btn btn--ghost" data-import="${col.key}">가져오기</button>
-      </div>
-    `;
-    list.appendChild(row);
-  }
-
-  list.addEventListener('click', async (e) => {
-    const copy = e.target.closest('[data-copy]');
-    const download = e.target.closest('[data-download]');
-    const imp = e.target.closest('[data-import]');
-    if (copy) {
-      await navigator.clipboard.writeText(store.exportJSON(copy.dataset.copy));
-      toast('JSON 클립보드 복사 완료', 'good');
-    }
-    if (download) {
-      const key = download.dataset.download;
-      downloadFile(store.FILENAMES[key], store.exportJSON(key));
-    }
-    if (imp) {
-      const key = imp.dataset.import;
-      openForm({
-        title: `${COLLECTIONS.find((c) => c.key === key).label} 가져오기`,
-        subtitle: 'JSON 배열 붙여넣기 · 현재 데이터를 덮어씀',
-        submitLabel: '덮어쓰기',
-        fields: [{ name: 'json', label: 'JSON', type: 'textarea', rows: 12, required: true, colspan: 2 }],
-        onSubmit: (data) => {
-          store.importJSON(key, data.json); // JSON 오류는 폼이 잡아서 표시한다
-          toast('가져오기 완료', 'good');
-          ctx.rerender();
-        },
-      });
-    }
-  });
-
-  body.appendChild(list);
-
-  const foot = el('div', 'sync-foot');
-  const reset = el('button', 'btn btn--danger-ghost', '레포 원본으로 되돌리기');
-  reset.addEventListener('click', () => {
-    if (confirmDialog('이 브라우저의 변경사항을 모두 버리고 레포 데이터로 되돌립니다.\n계속할까요?')) {
-      store.resetToRepo();
-      toast('레포 데이터로 되돌림', 'info');
-      ctx.rerender();
-    }
-  });
-  foot.appendChild(reset);
-  body.appendChild(foot);
-
-  card.appendChild(body);
-  return card;
-}
-
-// ── 아카이브 ────────────────────────────────────────────────────────────────
-
-function archiveCard(connected) {
-  const card = el('section', 'card');
-  card.innerHTML = `
-    <header class="card__head">
-      <div class="card__titles">
-        <h2 class="card__title">스냅샷 아카이브</h2>
-        <p class="card__sub">특정 시점의 전체 데이터를 한 파일로 보관</p>
+        <h2 class="card__title">백업</h2>
+        <p class="card__sub">전체 데이터를 한 파일로 내려받기</p>
       </div>
     </header>
   `;
@@ -282,33 +154,26 @@ function archiveCard(connected) {
       'p',
       'callout',
       connected
-        ? '일상적인 이력은 <strong>구글 시트의 버전 기록이 대신함</strong> · 시트에서 ' +
-            '<code>파일 → 버전 기록 → 버전 기록 보기</code> 로 언제든 되돌리기 가능<br>' +
-            '아래 스냅샷은 월말 보고용 파일이나 구글 밖 백업이 필요할 때 사용'
-        : '<code>data/</code> 를 커밋해두면 git 이력이 그대로 시점별 기록이 됨<br>' +
-            '아래 스냅샷은 월말 보고처럼 파일 하나로 남겨야 할 때만 사용'
+        ? '되돌리기는 <strong>시트의 버전 기록</strong>으로 하는 것이 빠름 — ' +
+            '<code>파일 → 버전 기록 → 버전 기록 보기</code><br>' +
+            '아래 파일은 구글 계정 밖에 사본을 남겨야 할 때 사용'
+        : '<strong>연결 전이라 표본 데이터가 담긴다</strong> · 실제 데이터를 받으려면 먼저 로그인할 것'
     )
   );
 
-  if (connected) {
-    const link = el('p', 'callout');
-    link.innerHTML =
-      `<a href="https://docs.google.com/spreadsheets/d/${escapeHtml(GOOGLE.spreadsheetId)}/edit" ` +
-      'target="_blank" rel="noopener"><strong>스프레드시트 열기 →</strong></a> · 원본 데이터와 버전 기록';
-    body.appendChild(link);
-  }
-
-  const btn = el('button', 'btn btn--primary', `${fmtDate(today())} 스냅샷 내려받기`);
+  const btn = el('button', 'btn btn--primary', `${fmtDate(today())} 백업 내려받기`);
   btn.addEventListener('click', () => {
     const snapshot = {
       snapshotDate: toISO(today()),
+      source: connected ? 'google-sheets' : 'local',
+      spreadsheetId: connected ? GOOGLE.spreadsheetId : '',
       generatedBy: 'Glendale Korea Project Dashboard',
       employees: JSON.parse(store.exportJSON('employees')),
       projects: JSON.parse(store.exportJSON('projects')),
       vacations: JSON.parse(store.exportJSON('vacations')),
       weeklyUpdates: JSON.parse(store.exportJSON('weeklyUpdates')),
     };
-    downloadFile(`glendale-snapshot-${toISO(today())}.json`, `${JSON.stringify(snapshot, null, 2)}\n`);
+    downloadFile(`glendale-backup-${toISO(today())}.json`, `${JSON.stringify(snapshot, null, 2)}\n`);
   });
   body.appendChild(btn);
   card.appendChild(body);
