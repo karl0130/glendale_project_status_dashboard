@@ -20,6 +20,7 @@ import {
   WEEKDAY_KO,
 } from './util.js';
 import { bindTooltip, el } from './ui.js';
+import { holidayName, isNonWorkingDay } from './holidays.js';
 
 const BAR_H = 18;
 const LANE_GAP = 4;
@@ -150,11 +151,20 @@ export function renderGantt({
   }
   const dayRow = el('div', 'gantt__days');
   for (const day of days) {
+    const name = holidayName(day);
     const cell = el(
       'div',
-      `gantt__day${isWeekend(day) ? ' is-weekend' : ''}${day.getTime() === now.getTime() ? ' is-today' : ''}`
+      `gantt__day${isWeekend(day) ? ' is-weekend' : ''}${name ? ' is-holiday' : ''}${
+        day.getTime() === now.getTime() ? ' is-today' : ''
+      }`
     );
-    cell.innerHTML = `<span class="gantt__daynum">${day.getDate()}</span><span class="gantt__dow">${WEEKDAY_KO[day.getDay()]}</span>`;
+    // 칸이 넉넉할 때만 공휴일 이름을 적는다. 월간처럼 하루가 30px 인 곳에서는
+    // 어차피 잘려서 '광복…' 이 되므로 요일을 그대로 두고 색과 title 로만 알린다.
+    const label = name && dayWidth >= 56 ? name : WEEKDAY_KO[day.getDay()];
+    cell.innerHTML =
+      `<span class="gantt__daynum">${day.getDate()}</span>` +
+      `<span class="gantt__dow">${escapeHtml(label)}</span>`;
+    if (name) cell.title = name;
     dayRow.appendChild(cell);
   }
   headTrack.append(weekRow, dayRow);
@@ -240,7 +250,9 @@ export function renderGantt({
     const track = el('div', 'gantt__track');
     const grid = el('div', 'gantt__grid');
     for (const day of days) {
-      grid.appendChild(el('div', `gantt__gridcell${isWeekend(day) ? ' is-weekend' : ''}`));
+      grid.appendChild(
+        el('div', `gantt__gridcell${isNonWorkingDay(day) ? ' is-weekend' : ''}`)
+      );
     }
     track.appendChild(grid);
 

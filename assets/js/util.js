@@ -100,10 +100,8 @@ export function intersectRange(aStart, aEnd, bStart, bEnd) {
   return start <= end ? { start, end } : null;
 }
 
-/** 주말을 뺀 영업일 수 */
-export function workdayCount(start, end) {
-  return eachDay(start, end).filter((d) => !isWeekend(d)).length;
-}
+/* 영업일 수는 holidays.js 의 businessDays 를 쓴다 — 공휴일까지 빼야 하기 때문이다.
+   주말만 빼는 함수를 여기 남겨두면 어디는 공휴일을 반영하고 어디는 안 하는 상태가 된다. */
 
 /**
  * 프로젝트 전체 기간이 몇 주에 걸치는지. 시작·종료일을 모두 포함해 세고 올림한다.

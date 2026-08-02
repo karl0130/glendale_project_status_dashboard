@@ -11,7 +11,8 @@
 import * as auth from './google/auth.js';
 import * as sheets from './google/sheets.js';
 import { COLLECTIONS, LEAVE_POLICY } from './config.js';
-import { byKo, parseDate, toISO, today, workdayCount } from './util.js';
+import { businessDays, setHolidays } from './holidays.js';
+import { byKo, parseDate, toISO, today } from './util.js';
 
 const SOURCES = {
   employees: 'data/employees.json',
@@ -67,6 +68,14 @@ function clone(value) {
 // ── 로드 ────────────────────────────────────────────────────────────────────
 
 export async function load() {
+  // 공휴일은 영업일 계산의 전제라 먼저 채운다. 없어도 화면은 돌아야 하므로 실패는 삼킨다.
+  try {
+    const res = await fetch(`data/holidays.json?v=${Date.now()}`, { cache: 'no-store' });
+    if (res.ok) setHolidays((await res.json()).days);
+  } catch {
+    console.warn('공휴일 데이터를 불러오지 못했습니다 — 주말만 제외해 계산합니다');
+  }
+
   const entries = await Promise.all(
     Object.entries(SOURCES).map(async ([key, path]) => {
       const res = await fetch(`${path}?v=${Date.now()}`, { cache: 'no-store' });
@@ -393,10 +402,8 @@ export function selfApproves(employee) {
 export function leaveCost(v) {
   if (LEAVE_POLICY.exempt.includes(v.type)) return 0;
   if (LEAVE_POLICY.halfDayTypes.includes(v.type)) return 0.5;
-  const s = parseDate(v.startDate);
-  const e = parseDate(v.endDate);
-  if (!s || !e || e < s) return 0;
-  return workdayCount(s, e);
+  // 주말뿐 아니라 공휴일도 빠진다. 광복절 끼고 휴가를 내면 그날은 차감되지 않는다.
+  return businessDays(parseDate(v.startDate), parseDate(v.endDate));
 }
 
 /**

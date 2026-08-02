@@ -17,8 +17,8 @@ import {
   today,
   weekLabel,
   weekSpan,
-  workdayCount,
 } from '../util.js';
+import { businessDays } from '../holidays.js';
 
 let anchor = null; // 표시 중인 2주 구간의 첫 월요일
 
@@ -112,13 +112,14 @@ function vacationCard(weekStart, weekEnd) {
   const rows = list.map((v) => {
     const s = parseDate(v.startDate);
     const e = parseDate(v.endDate);
-    const inWeek = eachDay(s > weekStart ? s : weekStart, e < weekEnd ? e : weekEnd);
     const half = v.type.startsWith('반차');
     return {
       name: store.employeeName(v.employeeId),
       type: v.type,
       period: fmtRange(v.startDate, v.endDate),
-      days: half ? '0.5일' : `${inWeek.filter((d) => d.getDay() !== 0 && d.getDay() !== 6).length}일`,
+      days: half
+        ? '0.5일'
+        : `${businessDays(s > weekStart ? s : weekStart, e < weekEnd ? e : weekEnd)}일`,
       status: store.vacationStatus(v),
     };
   });
@@ -250,7 +251,7 @@ function remainingWorkdays(p) {
   const end = parseDate(p.endDate);
   const from = today();
   if (!end || end < from) return 0;
-  return workdayCount(from, end);
+  return businessDays(from, end); // 주말 + 공휴일 제외
 }
 
 // ── 리소스 간트 ─────────────────────────────────────────────────────────────

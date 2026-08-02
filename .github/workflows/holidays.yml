@@ -1,0 +1,39 @@
+name: Update Korean holidays
+
+# 공휴일은 1년에 한 번만 갱신하면 된다. 12월 1일에 돌려 다음 해 달력을 미리 확보한다.
+# 임시공휴일이 갑자기 지정되면 Actions 탭에서 [Run workflow] 로 직접 돌리거나,
+# data/holidays.json 에 그 날짜를 손으로 추가하면 된다.
+on:
+  schedule:
+    - cron: '0 0 1 12 *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install holidays
+
+      - run: python scripts/gen_holidays.py
+
+      # 공휴일이 그대로면 커밋하지 않는다. 생성 시각을 파일에 넣지 않은 이유가 이것이다.
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- data/holidays.json; then
+            echo "공휴일 변경 없음 — 커밋 생략"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/holidays.json
+          git commit -m "Update Korean holidays for $(date +%Y)–$(( $(date +%Y) + 2 ))"
+          git push

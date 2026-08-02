@@ -10,8 +10,6 @@ import {
   endOfMonth,
   escapeHtml,
   fmtRange,
-  isWeekend,
-  eachDay,
   parseDate,
   startOfMonth,
   startOfWeek,
@@ -19,6 +17,7 @@ import {
   toISO,
   uid,
 } from '../util.js';
+import { businessDays } from '../holidays.js';
 import { vacationTooltip } from './overview.js';
 
 let anchor = null; // 표시 중인 달의 1일
@@ -153,7 +152,7 @@ function toRow(v) {
     type: v.type,
     status: store.vacationStatus(v),
     period: fmtRange(v.startDate, v.endDate),
-    days: half ? '0.5일' : `${eachDay(s, e).filter((d) => !isWeekend(d)).length}일`,
+    days: half ? '0.5일' : `${businessDays(s, e)}일`,
     note: v.note || '—',
     _id: v.id,
   };

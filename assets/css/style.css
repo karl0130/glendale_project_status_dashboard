@@ -1002,6 +1002,18 @@ textarea:focus {
 .gantt__dow {
   font-size: 10px;
   color: var(--ink-muted);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 공휴일 — 주말과 같은 음영에 날짜만 붉은 잉크로. 요일 자리에는 공휴일 이름이 들어간다. */
+.gantt__day.is-holiday {
+  background: var(--surface-sunken);
+}
+.gantt__day.is-holiday .gantt__daynum,
+.gantt__day.is-holiday .gantt__dow {
+  color: var(--status-critical);
 }
 .gantt__day.is-today .gantt__daynum {
   background: var(--brand-600);
