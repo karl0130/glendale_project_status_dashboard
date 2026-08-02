@@ -70,9 +70,12 @@ function connectionCard(ctx) {
     body.appendChild(
       el(
         'p',
-        'callout',
-        `<strong>연결됨</strong> · ${escapeHtml(store.account()?.email ?? '')} · 리비전 ${store.revision()}<br>` +
-          '모든 입력이 시트에 바로 저장되고 팀원 화면에도 반영'
+        store.isEmpty() ? 'callout callout--warning' : 'callout',
+        store.isEmpty()
+          ? `<strong>연결됐지만 시트가 비어 있음</strong> · ${escapeHtml(store.account()?.email ?? '')}<br>` +
+              '탭은 있으나 내용이 없음 · 아래 버튼으로 헤더와 표본 데이터를 넣을 것'
+          : `<strong>연결됨</strong> · ${escapeHtml(store.account()?.email ?? '')} · 리비전 ${store.revision()}<br>` +
+              '모든 입력이 시트에 바로 저장되고 팀원 화면에도 반영'
       )
     );
 
@@ -90,6 +93,16 @@ function connectionCard(ctx) {
       }
     });
     actions.appendChild(refresh);
+
+    // 탭은 있는데 안이 비어 있는 경우 — 손으로 탭만 만들어두면 이 상태가 된다.
+    // 지울 기록이 없으므로 초기화 버튼을 다시 내준다. 데이터가 한 건이라도 있으면
+    // 이 버튼은 나타나지 않는다.
+    if (store.isEmpty()) {
+      const init = el('button', 'btn btn--primary', '시트 채우기 — 헤더와 표본 데이터 넣기');
+      init.title = '탭은 있지만 내용이 비어 있습니다';
+      init.addEventListener('click', runBootstrap);
+      actions.appendChild(init);
+    }
   } else if (status === 'needs-bootstrap') {
     const missing = store.missingTabs();
     body.appendChild(

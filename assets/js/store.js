@@ -238,9 +238,20 @@ export async function reauthAndRetry() {
   return pending.size === 0;
 }
 
-/** 빈 스프레드시트에 탭·헤더를 만들고 현재 데이터를 밀어넣는다 (최초 1회). */
+/** 화면에 들고 있는 데이터가 한 건도 없는지 (= 시트가 비어 있는 상태로 연결됨). */
+export function isEmpty() {
+  return COLLECTIONS.every((key) => (state.data?.[key] ?? []).length === 0);
+}
+
+/**
+ * 빈 스프레드시트에 탭·헤더를 만들고 데이터를 밀어넣는다 (최초 1회).
+ *
+ * 씨앗은 화면에 들고 있는 데이터다. 다만 빈 시트에 연결된 상태라면 그 데이터도 비어 있어서
+ * 빈 헤더만 만들고 끝나버린다 — 그 경우에는 레포의 표본 데이터로 채운다.
+ */
 export async function bootstrapSheet() {
-  const result = await sheets.bootstrap(state.data);
+  const seed = isEmpty() ? state.base : state.data;
+  const result = await sheets.bootstrap(seed);
   await pull();
   return result;
 }
