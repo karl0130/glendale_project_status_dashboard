@@ -141,7 +141,7 @@ function vacationCard(weekStart, weekEnd) {
         { key: 'name', label: '이름' },
         { key: 'type', label: '휴가 유형' },
         { key: 'period', label: '일정' },
-        { key: 'days', label: '영업일', align: 'right' },
+        { key: 'days', label: '영업일' },
         {
           key: 'status',
           label: '상태',
@@ -233,7 +233,7 @@ function ongoingProjects(start, end, nav) {
         { key: 'status', label: '상태' },
         { key: 'pm', label: 'PM' },
         { key: 'period', label: '기간' },
-        { key: 'left', label: '잔여 영업일', align: 'right' },
+        { key: 'left', label: '잔여 영업일' },
       ],
       list.map((p) => ({
         client: p.client,

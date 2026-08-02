@@ -429,7 +429,13 @@ export function chartCard({ title, subtitle, actions, legend, chart, table, id, 
   return card;
 }
 
-/** 데이터 표. columns: [{ key, label, align, html }] */
+/**
+ * 데이터 표. columns: [{ key, label, align, html }]
+ *
+ * align: 'right' 는 **행 끝의 버튼 열에만** 쓴다.
+ * 숫자 열도 왼쪽 정렬로 통일한다 — '3일' '차감 없음' 처럼 단위와 문자열이 섞이는 열이라
+ * 오른쪽으로 붙여도 자릿수가 맞지 않고, 옆 열들과 시선만 어긋난다.
+ */
 export function renderTable(columns, rows, emptyText = '데이터가 없습니다.') {
   const wrap = el('div', 'table-scroll');
   if (!rows.length) {

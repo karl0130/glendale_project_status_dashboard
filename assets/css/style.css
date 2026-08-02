@@ -1362,9 +1362,9 @@ textarea:focus {
 .table tbody tr:last-child td {
   border-bottom: none;
 }
+/* 행 끝 버튼 열 전용. 숫자 열은 왼쪽 정렬로 통일한다. */
 .table .is-right {
   text-align: right;
-  font-variant-numeric: tabular-nums;
 }
 
 /* ── 주간 보고 상세 ──────────────────────────────────────────────────────── */

@@ -134,7 +134,7 @@ function monthCard(ctx, start, end) {
         { key: 'status', label: '상태', html: statusCell },
         { key: 'type', label: '유형' },
         { key: 'period', label: '기간' },
-        { key: 'days', label: '영업일', align: 'right' },
+        { key: 'days', label: '영업일' },
       ],
       monthList.map(toRow),
       '이 달에 등록된 휴가 없음'
@@ -203,7 +203,7 @@ function listCard(ctx) {
       { key: 'status', label: '상태', html: statusCell },
       { key: 'type', label: '유형' },
       { key: 'period', label: '기간' },
-      { key: 'days', label: '영업일', align: 'right' },
+      { key: 'days', label: '영업일' },
     ],
     list.map(toRow),
     scope === 'upcoming' ? '예정된 휴가 없음' : '등록된 휴가 없음'
