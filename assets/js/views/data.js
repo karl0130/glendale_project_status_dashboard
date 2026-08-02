@@ -5,11 +5,8 @@
 // 실제 데이터를 공개 레포에 올리는 길이라 아예 걷어냈다.
 
 import * as store from '../store.js';
-import { GOOGLE } from '../config.js';
 import { confirmDialog, el, toast } from '../ui.js';
 import { escapeHtml, fmtDate, today, toISO } from '../util.js';
-
-const SHEET_URL = `https://docs.google.com/spreadsheets/d/${GOOGLE.spreadsheetId}/edit`;
 
 export function render(ctx) {
   const view = el('div', 'view__inner');
@@ -79,13 +76,9 @@ function connectionCard(ctx) {
       )
     );
 
-    const open = el('a', 'btn btn--primary', '스프레드시트 열기 ↗');
-    open.href = SHEET_URL;
-    open.target = '_blank';
-    open.rel = 'noopener';
-    actions.appendChild(open);
-
-    const refresh = el('button', 'btn', '최신 내용 다시 받기');
+    // 연결된 시트에는 초기화 버튼을 두지 않는다 — 누르는 순간 그동안 쌓인 기록이
+    // 현재 화면 데이터로 덮어써진다. 시트 바로가기도 두지 않는다. 수정은 이 화면에서만.
+    const refresh = el('button', 'btn btn--primary', '최신 내용 다시 받기');
     refresh.title = '다른 사람이 저장한 내용을 지금 반영합니다';
     refresh.addEventListener('click', async () => {
       try {
@@ -97,11 +90,6 @@ function connectionCard(ctx) {
       }
     });
     actions.appendChild(refresh);
-
-    const again = el('button', 'btn btn--ghost', '시트 다시 초기화');
-    again.title = '탭이나 헤더가 망가졌을 때만 사용 — 현재 화면 데이터로 덮어씁니다';
-    again.addEventListener('click', runBootstrap);
-    actions.appendChild(again);
   } else if (status === 'needs-bootstrap') {
     const missing = store.missingTabs();
     body.appendChild(
@@ -154,9 +142,8 @@ function backupCard() {
       'p',
       'callout',
       connected
-        ? '되돌리기는 <strong>시트의 버전 기록</strong>으로 하는 것이 빠름 — ' +
-            '<code>파일 → 버전 기록 → 버전 기록 보기</code><br>' +
-            '아래 파일은 구글 계정 밖에 사본을 남겨야 할 때 사용'
+        ? '구글 계정 밖에 사본을 남겨야 할 때 사용<br>' +
+            '데이터 수정은 이 대시보드에서만 — 시트를 직접 여는 것은 권장하지 않음'
         : '<strong>연결 전이라 표본 데이터가 담긴다</strong> · 실제 데이터를 받으려면 먼저 로그인할 것'
     )
   );
@@ -166,7 +153,6 @@ function backupCard() {
     const snapshot = {
       snapshotDate: toISO(today()),
       source: connected ? 'google-sheets' : 'local',
-      spreadsheetId: connected ? GOOGLE.spreadsheetId : '',
       generatedBy: 'Glendale Korea Project Dashboard',
       employees: JSON.parse(store.exportJSON('employees')),
       projects: JSON.parse(store.exportJSON('projects')),
