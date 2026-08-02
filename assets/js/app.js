@@ -129,6 +129,27 @@ function topbar() {
 
   if (store.source() === 'sheets') {
     const { status, message } = store.saveState();
+
+    if (status === 'reauth') {
+      // 세션이 끊겼다. 저장 못 한 내용이 남아 있으니 버튼 하나로 이어서 처리한다.
+      const retry = el(
+        'button',
+        'savestate savestate--action',
+        '<span class="dot dot--critical" aria-hidden="true"></span>다시 로그인하고 저장'
+      );
+      retry.title = '로그인 세션이 만료되어 저장하지 못한 내용이 있습니다';
+      retry.addEventListener('click', async () => {
+        try {
+          const done = await store.reauthAndRetry();
+          toast(done ? '저장했습니다' : '일부 저장에 실패했습니다', done ? 'good' : 'warning');
+        } catch (err) {
+          toast(`로그인 실패 — ${err.message}`, 'warning');
+        }
+      });
+      meta.appendChild(retry);
+      return bar;
+    }
+
     const chip = el('span', `savestate savestate--${status}`);
     const text = {
       idle: '시트 연결됨',

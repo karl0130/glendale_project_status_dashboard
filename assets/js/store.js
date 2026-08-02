@@ -193,6 +193,9 @@ function enqueue(task) {
   return run;
 }
 
+/** 저장에 실패한 컬렉션. 재로그인 후 이어서 다시 밀어넣는다. */
+const pending = new Set();
+
 function pushCollection(key) {
   return enqueue(async () => {
     setSaveState('saving');
@@ -204,11 +207,26 @@ function pushCollection(key) {
         auth.currentAccount()?.email ?? ''
       );
       state.remote[key] = clone(state.data[key]);
-      setSaveState('saved');
+      pending.delete(key);
+      setSaveState(pending.size ? 'error' : 'saved');
     } catch (err) {
-      setSaveState('error', err.message);
+      pending.add(key);
+      // 세션 만료는 "저장 실패"와 다르다. 사용자가 할 일이 재시도가 아니라 로그인이다.
+      setSaveState(err.name === 'ReauthRequired' ? 'reauth' : 'error', err.message);
     }
   });
+}
+
+export function hasPendingSaves() {
+  return pending.size > 0;
+}
+
+/** 재로그인한 뒤 못 보낸 저장을 이어서 처리한다. */
+export async function reauthAndRetry() {
+  await auth.signIn();
+  const keys = [...pending];
+  for (const key of keys) await pushCollection(key);
+  return pending.size === 0;
 }
 
 /** 빈 스프레드시트에 탭·헤더를 만들고 현재 데이터를 밀어넣는다 (최초 1회). */

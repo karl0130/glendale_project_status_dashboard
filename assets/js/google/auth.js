@@ -60,9 +60,14 @@ async function ensureClient() {
 }
 
 /**
- * @param {'none'|'consent'} mode
- *   none    — 팝업 없이 시도. 세션이 없으면 실패한다 (자동 복구용).
- *   consent — 팝업을 띄운다. 사용자가 버튼을 눌렀을 때만 써야 팝업 차단에 안 걸린다.
+ * GIS 의 prompt 값 의미 (여기를 잘못 건드리면 매번 동의 화면이 뜬다):
+ *   ''         — 필요한 것만 보여준다. 이미 동의했으면 아무것도 안 뜬다.  ← interactive
+ *   'none'     — UI 를 절대 띄우지 않는다. 상호작용이 필요하면 실패.      ← silent
+ *   'consent'  — 매번 동의 화면을 강제한다. 우리는 쓰지 않는다.
+ *
+ * @param {'silent'|'interactive'} mode
+ *   silent      — 페이지 진입 시 자동 복구용. 실패해도 조용히 넘어간다.
+ *   interactive — 사용자가 버튼을 눌렀을 때만. 그래야 팝업 차단에 안 걸린다.
  */
 function requestToken(mode) {
   return new Promise((resolve, reject) => {
@@ -76,7 +81,7 @@ function requestToken(mode) {
     tokenClient.error_callback = (err) => {
       reject(new Error(err?.type === 'popup_closed' ? '로그인 창이 닫혔습니다' : err?.type || 'popup_failed'));
     };
-    tokenClient.requestAccessToken({ prompt: mode === 'consent' ? '' : 'none' });
+    tokenClient.requestAccessToken({ prompt: mode === 'interactive' ? '' : 'none' });
   });
 }
 
@@ -93,10 +98,10 @@ async function fetchAccount() {
   }
 }
 
-/** 사용자가 로그인 버튼을 눌렀을 때. 팝업이 뜬다. */
+/** 사용자가 로그인 버튼을 눌렀을 때. 최초 1회만 동의 화면이 뜨고, 이후엔 뜨지 않는다. */
 export async function signIn() {
   await ensureClient();
-  await requestToken('consent');
+  await requestToken('interactive');
   await fetchAccount();
   emit();
   return accessToken;
@@ -107,7 +112,7 @@ export async function restore() {
   if (!isConfigured()) return false;
   try {
     await ensureClient();
-    await requestToken('none');
+    await requestToken('silent');
     await fetchAccount();
     emit();
     return true;
@@ -127,11 +132,35 @@ export function signOut() {
   emit();
 }
 
-/** 유효한 토큰을 돌려준다. 만료됐으면 조용히 한 번 갱신을 시도한다. */
+/**
+ * 재로그인이 필요하다는 신호. 저장 실패와 구분해야 한다 —
+ * 사용자가 할 일이 "다시 시도"가 아니라 "로그인 버튼 클릭"이기 때문이다.
+ */
+export class ReauthRequired extends Error {
+  constructor(message = '로그인 세션이 만료되었습니다') {
+    super(message);
+    this.name = 'ReauthRequired';
+  }
+}
+
+/**
+ * 유효한 토큰을 돌려준다. 만료됐으면 조용히 갱신을 시도한다.
+ *
+ * 이 흐름에는 갱신 토큰이 없어서, 조용한 갱신은 브라우저에 구글 세션이 살아 있을 때만
+ * 성공한다. 보통은 성공하지만(업무 브라우저는 구글에 로그인돼 있다), 실패하면
+ * 사용자가 버튼을 한 번 눌러야 하므로 그 사실을 분명히 구분해 올린다.
+ */
 export async function getToken() {
   if (isSignedIn()) return accessToken;
   await ensureClient();
-  await requestToken('none');
+  try {
+    await requestToken('silent');
+  } catch {
+    accessToken = null;
+    expiresAt = 0;
+    emit();
+    throw new ReauthRequired();
+  }
   emit();
   return accessToken;
 }
