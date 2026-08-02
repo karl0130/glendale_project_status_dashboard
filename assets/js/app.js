@@ -7,15 +7,29 @@ import * as overview from './views/overview.js';
 import * as projects from './views/projects.js';
 import * as resources from './views/resources.js';
 import * as weekly from './views/weekly.js';
+import * as vacations from './views/vacations.js';
 import * as dataView from './views/data.js';
 
+// 아이콘은 전부 인라인 SVG — 외부 아이콘 폰트나 CDN에 기대지 않는다.
+const ICONS = {
+  overview: '<rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/>',
+  projects: '<path d="M6 3h7.5L18 7.5V21H6z"/><path d="M13.5 3v4.5H18"/><path d="M9 12.5h6M9 16.5h6"/>',
+  resources: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20.5c0-3.4 2.7-6.2 6-6.2s6 2.8 6 6.2"/><circle cx="17.5" cy="9.5" r="2.4"/><path d="M16.6 14.6c2.6.5 4.4 2.9 4.4 5.9"/>',
+  weekly: '<rect x="3" y="5" width="18" height="16" rx="2.2"/><path d="M8 3v4M16 3v4M3 10.5h18"/><path d="M9 15.5l2 2 4-4"/>',
+  vacations: '<circle cx="12" cy="12" r="3.8"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/>',
+  data: '<rect x="3" y="4" width="18" height="5" rx="1.6"/><path d="M5 9.5v9.6A1.9 1.9 0 006.9 21h10.2a1.9 1.9 0 001.9-1.9V9.5"/><path d="M10 13.5h4"/>',
+};
+
 const ROUTES = [
-  { id: 'overview', num: '', label: 'Overview', sub: '전체 현황', render: overview.render },
-  { id: 'projects', num: '1', label: 'Project Status', sub: '프로젝트 등록 · 일정', render: projects.render },
-  { id: 'resources', num: '2', label: 'Resource Planning', sub: '인력 투입 현황', render: resources.render },
-  { id: 'weekly', num: '3', label: 'Weekly Work Updates', sub: '주간 업무 보고', render: weekly.render },
-  { id: 'data', num: '', label: '데이터 & 아카이브', sub: '반영 · 백업', render: dataView.render },
+  { id: 'overview', label: 'Overview', sub: '전체 현황', render: overview.render },
+  { id: 'projects', label: 'Project Status', sub: '프로젝트 등록 · 일정', render: projects.render },
+  { id: 'resources', label: 'Resource Planning', sub: '인력 투입 현황', render: resources.render },
+  { id: 'weekly', label: 'Weekly Work Updates', sub: '주간 업무 보고', render: weekly.render },
+  { id: 'vacations', label: '휴가 관리', sub: '휴가 신청 · 일정', render: vacations.render },
+  { id: 'data', label: '데이터 & 아카이브', sub: '반영 · 백업', render: dataView.render },
 ];
+
+const DETAIL_IDS = ['projects', 'resources', 'weekly', 'vacations'];
 
 const app = document.getElementById('app');
 
@@ -62,7 +76,7 @@ function paint() {
     main.appendChild(route.render(ctx));
   } catch (err) {
     console.error(err);
-    main.appendChild(el('p', 'callout callout--warning', `화면을 그리는 중 오류가 발생했습니다: ${err.message}`));
+    main.appendChild(el('p', 'callout callout--warning', `화면을 그리는 중 오류 발생 — ${err.message}`));
   }
   bodyEl.appendChild(main);
   app.appendChild(bodyEl);
@@ -72,11 +86,9 @@ function topbar() {
   const bar = el('header', 'topbar');
   bar.innerHTML = `
     <div class="brand">
-      <span class="brand__mark" aria-hidden="true"></span>
-      <div class="brand__text">
-        <h1 class="brand__title">Glendale Korea Project Dashboard</h1>
-        <p class="brand__sub">프로젝트 일정 · 인력 리소스 · 주간 업무 통합 관리</p>
-      </div>
+      <img class="brand__logo" src="assets/img/logo.png" alt="Glendale Korea" />
+      <span class="brand__divider" aria-hidden="true"></span>
+      <h1 class="brand__title">Glendale Korea Project Dashboard</h1>
     </div>
     <div class="topbar__meta">
       <span class="topbar__date">${fmtDate(today())}</span>
@@ -90,7 +102,7 @@ function topbar() {
       'savestate savestate--dirty',
       '<span class="dot dot--warning" aria-hidden="true"></span>미반영 변경 있음'
     );
-    badge.title = '이 브라우저에만 저장된 변경이 있습니다. 클릭하면 반영 화면으로 이동합니다.';
+    badge.title = '이 브라우저에만 저장된 변경 있음 · 클릭 시 반영 화면으로 이동';
     badge.addEventListener('click', () => ctx.navigate('data'));
     meta.appendChild(badge);
   } else {
@@ -106,7 +118,7 @@ function sidebar(active) {
   nav.setAttribute('aria-label', '상세 페이지');
 
   const main = ROUTES.filter((r) => r.id === 'overview');
-  const details = ROUTES.filter((r) => r.num);
+  const details = ROUTES.filter((r) => DETAIL_IDS.includes(r.id));
   const utils = ROUTES.filter((r) => r.id === 'data');
 
   nav.appendChild(navGroup('메인', main, active));
@@ -124,7 +136,9 @@ function navGroup(title, routes, active) {
     item.innerHTML = `
       <a class="navlink${route.id === active.id ? ' is-active' : ''}" href="#/${route.id}"
          ${route.id === active.id ? 'aria-current="page"' : ''}>
-        ${route.num ? `<span class="navlink__num">${route.num}</span>` : '<span class="navlink__num navlink__num--dot">•</span>'}
+        <span class="navlink__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">${ICONS[route.id]}</svg>
+        </span>
         <span class="navlink__text">
           <span class="navlink__label">${route.label}</span>
           <span class="navlink__sub">${route.sub}</span>
@@ -145,16 +159,16 @@ store
   .then(() => {
     paint();
     if (store.hasLocalChanges()) {
-      toast('이 브라우저에 저장된 변경사항을 불러왔습니다.', 'info');
+      toast('이 브라우저에 저장된 변경사항 불러옴', 'info');
     }
   })
   .catch((err) => {
     console.error(err);
     app.innerHTML = `
       <div class="fatal">
-        <h1>데이터를 불러오지 못했습니다</h1>
+        <h1>데이터 불러오기 실패</h1>
         <p>${err.message}</p>
-        <p class="fatal__hint">파일을 직접 열지 말고 로컬 서버로 실행해야 합니다:
-          <code>python -m http.server 8000</code> 실행 후 <code>http://localhost:8000</code> 으로 접속하세요.</p>
+        <p class="fatal__hint">파일을 직접 여는 방식은 동작하지 않음 · 로컬 서버 실행 필요<br>
+          <code>python -m http.server 8000</code> 실행 후 <code>http://localhost:8000</code> 접속</p>
       </div>`;
   });

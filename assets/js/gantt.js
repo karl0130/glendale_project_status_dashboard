@@ -4,7 +4,7 @@
 //   · 바 높이 18px (24px 상한 이하), 양 끝 4px 라운드 — 양쪽 모두 데이터 끝이므로.
 //   · 맞닿는 바는 테두리가 아니라 2px 표면 간격으로 분리한다.
 //   · 격자/축은 1px 실선 헤어라인. 점선은 쓰지 않는다(임계선으로 오독됨).
-//   · 색은 "프로젝트"라는 개체를 따라간다. 필터가 바뀌어도 재배정하지 않는다.
+//   · 색은 개체(프로젝트 또는 상태)를 따라간다. 필터가 바뀌어도 재배정하지 않는다.
 //   · 모든 바에 이름을 직접 라벨링한다. 색만으로 식별을 요구하지 않는다.
 //   · 툴팁은 보조 수단이고, 같은 값이 항상 '표 보기'에도 존재한다.
 
@@ -29,6 +29,11 @@ const ROW_PAD = 8;
    그보다 높으면 글자가 잘린다. 둘 중 큰 쪽을 쓰고 바는 세로 중앙에 놓는다. */
 const LABEL_MIN_H = { plain: 40, sub: 54, badge: 78 };
 
+/** 색 슬롯 → CSS 클래스 접미사. 숫자면 카테고리 슬롯, 문자열이면 상태 토큰. */
+function colorClass(color) {
+  return typeof color === 'number' ? `c${color}` : String(color ?? 'c0');
+}
+
 /** 연속된 날짜를 주(월요일 시작) 단위로 묶는다. 부분 주도 그대로 처리된다. */
 function groupByWeek(days) {
   const groups = [];
@@ -41,21 +46,37 @@ function groupByWeek(days) {
   return groups;
 }
 
-/** 겹치는 바를 서로 다른 레인에 배치한다. 한 사람의 동시 투입이 시각적으로 드러난다. */
+/**
+ * 겹치는 바를 서로 다른 레인에 배치한다.
+ * bar.lane 이 미리 지정돼 있으면 그대로 존중한다 — 리소스 화면에서 "프로젝트 하나 = 한 줄,
+ * 그 줄 안에서 휴가 구간만 치환" 을 보장하려면 레인이 자동 계산에 흔들리면 안 된다.
+ */
 function packLanes(bars) {
   const lanes = [];
-  for (const bar of bars) {
+  const ensure = (i) => {
+    while (lanes.length <= i) lanes.push([]);
+    return lanes[i];
+  };
+
+  for (const bar of bars.filter((b) => Number.isInteger(b.lane))) {
+    ensure(bar.lane).push(bar);
+  }
+
+  for (const bar of bars.filter((b) => !Number.isInteger(b.lane))) {
     let placed = false;
-    for (const lane of lanes) {
-      if (lane.every((b) => bar.startIndex > b.endIndex || bar.endIndex < b.startIndex)) {
-        lane.push(bar);
+    for (let i = 0; i < lanes.length; i += 1) {
+      if (lanes[i].every((b) => bar.startIndex > b.endIndex || bar.endIndex < b.startIndex)) {
+        lanes[i].push(bar);
+        bar.lane = i;
         placed = true;
         break;
       }
     }
-    if (!placed) lanes.push([bar]);
+    if (!placed) {
+      bar.lane = lanes.length;
+      ensure(bar.lane).push(bar);
+    }
   }
-  lanes.forEach((lane, i) => lane.forEach((bar) => (bar.lane = i)));
   return lanes.length || 1;
 }
 
@@ -63,8 +84,9 @@ function packLanes(bars) {
  * @param {Object}   opts
  * @param {Date}     opts.start        표시 구간 시작
  * @param {Date}     opts.end          표시 구간 끝 (포함)
- * @param {string}   opts.labelHeader  좌측 라벨 열 제목
- * @param {Array}    opts.rows         [{ id, label, sub, badge, bars }]
+ * @param {string}   opts.labelHeader  좌측 라벨 열 제목 (단일 열일 때)
+ * @param {Array}    opts.columns      좌측 열이 여럿일 때 [{ label, width }]
+ * @param {Array}    opts.rows         [{ id, label, sub, cells, badge, bars }]
  * @param {string}   opts.emptyText    행이 없을 때 문구
  * @param {number}   opts.dayWidth     하루 최소 폭(px)
  */
@@ -72,10 +94,19 @@ export function renderGantt({
   start,
   end,
   labelHeader = '',
+  columns = null,
   rows = [],
   emptyText = '표시할 항목이 없습니다.',
   dayWidth = 34,
 }) {
+  const cols = columns ?? [{ label: labelHeader, width: 218 }];
+  const offsets = [];
+  cols.reduce((acc, col) => {
+    offsets.push(acc);
+    return acc + col.width;
+  }, 0);
+  const labelWidth = cols.reduce((sum, col) => sum + col.width, 0);
+
   const days = eachDay(start, end);
   const total = days.length;
   const now = today();
@@ -85,11 +116,22 @@ export function renderGantt({
   const root = el('div', 'gantt');
   const scroll = el('div', 'gantt__scroll');
   const inner = el('div', 'gantt__inner');
-  inner.style.minWidth = `${total * dayWidth}px`;
+  inner.style.minWidth = `${labelWidth + total * dayWidth}px`;
+
+  const labelCell = (col, index, content, extraClass = '') => {
+    const cell = el('div', `gantt__labelcol${extraClass}`);
+    cell.style.flex = `0 0 ${col.width}px`;
+    cell.style.width = `${col.width}px`;
+    cell.style.left = `${offsets[index]}px`;
+    cell.innerHTML = content;
+    return cell;
+  };
 
   // ── 헤더 ──
   const head = el('div', 'gantt__head');
-  head.appendChild(el('div', 'gantt__labelcol gantt__labelcol--head', escapeHtml(labelHeader)));
+  cols.forEach((col, i) =>
+    head.appendChild(labelCell(col, i, escapeHtml(col.label), ' gantt__labelcol--head'))
+  );
 
   const headTrack = el('div', 'gantt__headtrack');
   const weekRow = el('div', 'gantt__weeks');
@@ -106,7 +148,10 @@ export function renderGantt({
   }
   const dayRow = el('div', 'gantt__days');
   for (const day of days) {
-    const cell = el('div', `gantt__day${isWeekend(day) ? ' is-weekend' : ''}${day.getTime() === now.getTime() ? ' is-today' : ''}`);
+    const cell = el(
+      'div',
+      `gantt__day${isWeekend(day) ? ' is-weekend' : ''}${day.getTime() === now.getTime() ? ' is-today' : ''}`
+    );
     cell.innerHTML = `<span class="gantt__daynum">${day.getDate()}</span><span class="gantt__dow">${WEEKDAY_KO[day.getDay()]}</span>`;
     dayRow.appendChild(cell);
   }
@@ -116,12 +161,11 @@ export function renderGantt({
 
   // ── 본문 ──
   const body = el('div', 'gantt__body');
-
-  if (!rows.length) {
-    body.appendChild(el('div', 'gantt__empty', escapeHtml(emptyText)));
-  }
+  if (!rows.length) body.appendChild(el('div', 'gantt__empty', escapeHtml(emptyText)));
 
   for (const row of rows) {
+    const cells = row.cells ?? [{ text: row.label, sub: row.sub }];
+
     const bars = (row.bars ?? [])
       .map((bar) => {
         const s = bar.start instanceof Date ? bar.start : parseDate(bar.start);
@@ -129,34 +173,31 @@ export function renderGantt({
         if (!s || !e) return null;
         const startIndex = Math.max(0, diffDays(start, s));
         const endIndex = Math.min(total - 1, diffDays(start, e));
-        if (endIndex < 0 || startIndex > total - 1) return null;
-        return {
-          ...bar,
-          startIndex,
-          endIndex,
-          clippedStart: s < start,
-          clippedEnd: e > end,
-        };
+        if (endIndex < 0 || startIndex > total - 1 || endIndex < startIndex) return null;
+        return { ...bar, startIndex, endIndex, clippedStart: s < start, clippedEnd: e > end };
       })
       .filter(Boolean)
       .sort((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex);
 
     const laneCount = packLanes(bars);
     const barsHeight = laneCount * BAR_H + (laneCount - 1) * LANE_GAP;
-    const labelMin = row.badge ? LABEL_MIN_H.badge : row.sub ? LABEL_MIN_H.sub : LABEL_MIN_H.plain;
+    const hasSub = cells.some((c) => c && c.sub);
+    const labelMin = row.badge ? LABEL_MIN_H.badge : hasSub ? LABEL_MIN_H.sub : LABEL_MIN_H.plain;
     const rowHeight = Math.max(barsHeight + ROW_PAD * 2, labelMin);
     const barsTop = Math.round((rowHeight - barsHeight) / 2);
 
     const rowEl = el('div', 'gantt__row');
     rowEl.style.height = `${rowHeight}px`;
 
-    const labelCell = el('div', 'gantt__labelcol');
-    labelCell.innerHTML = `
-      <span class="gantt__rowlabel">${escapeHtml(row.label)}</span>
-      ${row.sub ? `<span class="gantt__rowsub">${escapeHtml(row.sub)}</span>` : ''}
-      ${row.badge ? badgeHtml(row.badge) : ''}
-    `;
-    rowEl.appendChild(labelCell);
+    cols.forEach((col, i) => {
+      const cell = cells[i] ?? {};
+      const content = `
+        ${cell.text ? `<span class="gantt__rowlabel${i > 0 ? ' gantt__rowlabel--sub' : ''}">${escapeHtml(cell.text)}</span>` : ''}
+        ${cell.sub ? `<span class="gantt__rowsub">${escapeHtml(cell.sub)}</span>` : ''}
+        ${i === 0 && row.badge ? badgeHtml(row.badge) : ''}
+      `;
+      rowEl.appendChild(labelCell(col, i, content));
+    });
 
     const track = el('div', 'gantt__track');
     const grid = el('div', 'gantt__grid');
@@ -175,7 +216,10 @@ export function renderGantt({
     for (const bar of bars) {
       const leftPct = (bar.startIndex / total) * 100;
       const widthPct = ((bar.endIndex - bar.startIndex + 1) / total) * 100;
-      const node = el('div', `gbar gbar--c${bar.color ?? 0}${bar.kind ? ` gbar--${bar.kind}` : ''}`);
+      const node = el(
+        'div',
+        `gbar gbar--${colorClass(bar.color)}${bar.kind ? ` gbar--${bar.kind}` : ''}`
+      );
       node.style.left = `calc(${leftPct}% + 1px)`; // 좌우 1px씩 → 맞닿는 바 사이 2px 표면 간격
       node.style.width = `calc(${widthPct}% - 2px)`;
       node.style.top = `${barsTop + bar.lane * (BAR_H + LANE_GAP)}px`;
@@ -184,7 +228,7 @@ export function renderGantt({
       if (bar.clippedEnd) node.classList.add('is-clipped-end');
       node.tabIndex = 0;
       node.setAttribute('role', 'img');
-      node.setAttribute('aria-label', bar.aria ?? `${row.label} ${bar.label}`);
+      node.setAttribute('aria-label', bar.aria ?? `${cells[0]?.text ?? ''} ${bar.label}`);
       node.innerHTML = `<span class="gbar__label">${escapeHtml(bar.label)}</span>`;
       if (bar.tooltip) bindTooltip(node, bar.tooltip);
       if (bar.onClick) {
@@ -222,12 +266,37 @@ export function renderGantt({
   return root;
 }
 
+/**
+ * 라벨 배치. 바 안에 들어가면 안에, 아니면 바 오른쪽 바깥으로 내보낸다.
+ * 바깥에 낼 자리조차 없으면 (같은 줄에 바로 다음 바가 붙어 있으면) 아예 감춘다 —
+ * 옆 바 위에 글자가 겹쳐 찍히는 것이 라벨 없는 것보다 나쁘기 때문이다.
+ * 감춘 값은 툴팁과 '표' 보기에 그대로 남아 있어 어디서도 사라지지 않는다.
+ */
 function fitLabels(root) {
-  for (const bar of root.querySelectorAll('.gbar')) {
-    const label = bar.querySelector('.gbar__label');
-    if (!label) continue;
-    bar.classList.remove('has-outside-label');
-    if (label.scrollWidth + 14 > bar.clientWidth) bar.classList.add('has-outside-label');
+  for (const layer of root.querySelectorAll('.gantt__bars')) {
+    const lanes = new Map();
+    for (const bar of layer.querySelectorAll('.gbar')) {
+      const key = bar.style.top;
+      if (!lanes.has(key)) lanes.set(key, []);
+      lanes.get(key).push(bar);
+    }
+
+    for (const lane of lanes.values()) {
+      lane.sort((a, b) => a.offsetLeft - b.offsetLeft);
+      lane.forEach((bar, i) => {
+        const label = bar.querySelector('.gbar__label');
+        if (!label) return;
+        bar.classList.remove('has-outside-label', 'has-hidden-label');
+        if (!label.textContent.trim()) return;
+        if (label.scrollWidth + 14 <= bar.clientWidth) return;
+
+        bar.classList.add('has-outside-label');
+        const barEnd = bar.offsetLeft + bar.offsetWidth;
+        const next = lane[i + 1];
+        const room = (next ? next.offsetLeft : layer.clientWidth) - barEnd - 9;
+        if (label.scrollWidth > room) bar.classList.add('has-hidden-label');
+      });
+    }
   }
 }
 
@@ -243,7 +312,7 @@ export function renderLegend(items) {
   node.innerHTML = items
     .map(
       (item) =>
-        `<span class="legend__item"><span class="legend__swatch legend__swatch--c${item.color}"></span>${escapeHtml(item.label)}</span>`
+        `<span class="legend__item"><span class="legend__swatch legend__swatch--${colorClass(item.color)}"></span>${escapeHtml(item.label)}</span>`
     )
     .join('');
   return node;
@@ -253,15 +322,23 @@ export function renderLegend(items) {
  * 카드 껍데기 + '차트 / 표' 전환.
  * 모든 차트는 표 보기 쌍을 갖는다 — 색만으로 정보가 갇히지 않게 하기 위한 장치다.
  */
-export function chartCard({ title, subtitle, actions, legend, chart, table, id }) {
-  const card = el('section', 'card');
+export function chartCard({ title, subtitle, actions, legend, chart, table, id, className = '' }) {
+  const card = el('section', `card ${className}`.trim());
   if (id) card.id = id;
+
+  // 설명이 여러 갈래면 배열로 넘긴다 — 한 갈래가 한 줄을 차지해
+  // 문장 도중에 줄이 접히지 않는다.
+  const subHtml = Array.isArray(subtitle)
+    ? subtitle.map((line) => `<span class="subline">${escapeHtml(line)}</span>`).join('')
+    : subtitle
+      ? escapeHtml(subtitle)
+      : '';
 
   const head = el('header', 'card__head');
   head.innerHTML = `
     <div class="card__titles">
       <h2 class="card__title">${escapeHtml(title)}</h2>
-      ${subtitle ? `<p class="card__sub">${escapeHtml(subtitle)}</p>` : ''}
+      ${subHtml ? `<p class="card__sub">${subHtml}</p>` : ''}
     </div>
   `;
   const tools = el('div', 'card__tools');

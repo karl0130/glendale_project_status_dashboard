@@ -70,6 +70,36 @@ export function overlaps(aStart, aEnd, bStart, bEnd) {
   return aStart <= bEnd && bStart <= aEnd;
 }
 
+/**
+ * [start, end] 에서 blocks 구간들을 도려내고 남은 조각들을 돌려준다.
+ * 휴가 기간에 프로젝트 바를 끊어 같은 줄에 휴가 블록을 끼워 넣는 데 쓴다.
+ * @param {Array<{start: Date, end: Date}>} blocks
+ * @returns {Array<{start: Date, end: Date}>}
+ */
+export function subtractRanges(start, end, blocks) {
+  let segments = [{ start, end }];
+  for (const block of blocks) {
+    const next = [];
+    for (const seg of segments) {
+      if (block.end < seg.start || block.start > seg.end) {
+        next.push(seg);
+        continue;
+      }
+      if (block.start > seg.start) next.push({ start: seg.start, end: addDays(block.start, -1) });
+      if (block.end < seg.end) next.push({ start: addDays(block.end, 1), end: seg.end });
+    }
+    segments = next;
+  }
+  return segments;
+}
+
+/** 두 기간의 교집합. 겹치지 않으면 null. */
+export function intersectRange(aStart, aEnd, bStart, bEnd) {
+  const start = aStart > bStart ? aStart : bStart;
+  const end = aEnd < bEnd ? aEnd : bEnd;
+  return start <= end ? { start, end } : null;
+}
+
 /** 주말을 뺀 영업일 수 */
 export function workdayCount(start, end) {
   return eachDay(start, end).filter((d) => !isWeekend(d)).length;

@@ -199,6 +199,24 @@ export function vacationsInRange(start, end) {
   });
 }
 
+/**
+ * 특정 인원의 휴가 구간 전체(Date 범위).
+ * 프로젝트/업무 바를 이 구간에서 끊고 그 자리에 휴가 블록을 끼워 넣는 데 쓴다.
+ */
+export function vacationBlocks(employeeId) {
+  return all('vacations')
+    .filter((v) => v.employeeId === employeeId)
+    .map((v) => ({
+      id: v.id,
+      start: parseDate(v.startDate),
+      end: parseDate(v.endDate),
+      type: v.type,
+      note: v.note ?? '',
+    }))
+    .filter((v) => v.start && v.end)
+    .sort((a, b) => a.start - b.start);
+}
+
 /** 특정 기간에 걸치는 주간 업무 */
 export function updatesInRange(start, end) {
   return all('weeklyUpdates').filter((u) => {

@@ -7,11 +7,25 @@
 
 | 경로 | 화면 | 내용 |
 |---|---|---|
-| `#/overview` | Overview | 2주 단위 프로젝트 간트 · 2주 단위 리소스 간트 · 금주 휴가 표 · KPI |
-| `#/projects` | 1. Project Status | 프로젝트 등록/수정 + 4주 간트 + 전체 목록 |
-| `#/resources` | 2. Resource Planning | 인원별 월간 투입 간트 + 가동률 (자동 산출) |
-| `#/weekly` | 3. Weekly Work Updates | 주간 업무 기입 + 직원별 주간 간트 + 상세 보고 |
-| `#/data` | 데이터 & 아카이브 | 변경사항 반영 · 휴가 관리 · 스냅샷 |
+| `#/overview` | Overview | 핵심 지표 2종 + 금주 휴가 · 2주 단위 프로젝트 간트 · 2주 단위 리소스 간트 |
+| `#/projects` | Project Status | 프로젝트 등록/수정 + 4주 간트 + 전체 목록 |
+| `#/resources` | Resource Planning | 인원별 월간 투입 간트 (입력 없이 자동 산출) |
+| `#/weekly` | Weekly Work Updates | 주간 업무 기입 + 작성자·프로젝트별 주간 간트 + 상세 보고 |
+| `#/vacations` | 휴가 관리 | 휴가 신청/수정 + 월간 휴가 간트 + 신청 내역 |
+| `#/data` | 데이터 & 아카이브 | 변경사항 반영 · 스냅샷 |
+
+### 화면 사이의 연결
+
+```
+Project Status (프로젝트 · PM · 팀원 · 기간)  ─┐
+                                              ├─→ Resource Planning (자동 산출, 입력 없음)
+휴가 관리 (휴가 일정) ────────────────────────┘   └─→ Overview 금주 휴가 · 리소스 간트
+                                                  └─→ Weekly Work Updates 간트
+```
+
+리소스 간트와 주간 업무 간트에서 휴가는 **별도 행으로 빠지지 않는다.** 프로젝트 바가 휴가
+기간에 끊기고 같은 줄 그 자리에 휴가 블록이 들어간다. 두 프로젝트를 동시에 하면 줄이 둘로
+나뉘고 휴가는 양쪽 모두에 표시된다.
 
 ## 데이터가 저장되는 방식
 
@@ -49,7 +63,7 @@ git show <commit>:data/projects.json        # 그 시점의 프로젝트 현황
 | `data/employees.json` | 구성원 명단 | 직접 편집 |
 | `data/projects.json` | 프로젝트 (고객사, End client, 상태, PM, 팀원, 기간) | Project Status |
 | `data/weekly-updates.json` | 주간 수행 업무 | Weekly Work Updates |
-| `data/vacations.json` | 휴가 일정 | 데이터 & 아카이브 |
+| `data/vacations.json` | 휴가 일정 | 휴가 관리 |
 
 Resource Planning은 **입력이 없다.** `projects.json`의 PM·팀원·기간에서 자동으로 산출된다.
 
@@ -81,15 +95,27 @@ npx serve .
 ```
 index.html
 assets/css/style.css
+assets/img/logo.png
 assets/js/
-  app.js          라우터 + 셸
+  app.js          라우터 + 셸 + 사이드바 아이콘(인라인 SVG)
   store.js        데이터 로드 · 수정 · 내보내기
   gantt.js        간트 렌더러 · 표 · 범례 · 카드
   ui.js           모달 폼 · 툴팁 · 토스트
   util.js         날짜 유틸
-  views/          overview · projects · resources · weekly · data
+  views/          overview · projects · resources · weekly · vacations · data
 data/*.json
 ```
+
+## 타이포그래피
+
+본문은 **나눔스퀘어**, jsDelivr CDN에서 불러온다 (`index.html` 상단).
+
+나눔스퀘어는 **300 / 400 / 700 / 800** 네 단계만 있다. 그래서 `style.css` 의 `font-weight` 는
+`400` · `700` · `800` 만 쓴다 — 500이나 600 같은 중간값을 쓰면 브라우저가 임의로 반올림해
+의도와 다른 굵기가 나온다.
+
+폐쇄망이라 CDN을 못 쓴다면 woff2 를 `assets/font/` 에 내려받고 `index.html` 의 `<link>` 를
+로컬 `@font-face` 로 바꾸면 된다. 나머지는 그대로 동작한다.
 
 ## 시각화 규칙
 
@@ -99,8 +125,10 @@ data/*.json
 - **카테고리 색은 8슬롯이 상한.** 9번째 프로젝트부터는 새 색을 만들지 않고 중립 회색으로 접는다. 슬롯 순서 자체가 색각이상 대비 안전장치이므로 재배열하지 않는다.
 - **상태색(good/warning/critical)은 예약어.** 프로젝트 식별에 전용하지 않고, 항상 아이콘 + 글자와 함께 쓴다.
 - **모든 차트에 표 보기 쌍이 있다.** 색만으로 갇히는 정보가 없다.
-- **바 라벨은 잘리지 않는다.** 바 안에 안 들어가면 바깥으로 내보낸다.
+- **바 라벨은 잘리지 않는다.** 바 안에 안 들어가면 바깥으로 내보내고, 바깥에도 자리가 없으면 감춘다 (옆 바 위에 글자가 겹치는 것이 라벨 없는 것보다 나쁘다). 감춘 값은 툴팁과 표 보기에 그대로 남는다.
+- **휴가로 쪼개진 바는 조각마다 이름을 달지 않는다.** 화면에 보이는 구간 기준으로 가장 넓은 조각 하나만 라벨을 갖는다.
 - 격자/축은 1px 실선 헤어라인. 점선은 임계선으로 오독되므로 쓰지 않는다.
+- **안내 문구는 마침표 없는 명사형**으로 통일한다 ("~합니다." ✗ / "~자동 반영" ○). 설명이 여러 갈래면 배열로 넘겨 한 갈래가 한 줄을 차지하게 한다 — 한글이 문장 도중에 접히는 것을 막기 위함.
 
 ## 다음 단계 (프로토타입 이후)
 

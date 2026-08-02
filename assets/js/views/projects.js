@@ -33,7 +33,7 @@ export function render(ctx) {
   view.appendChild(
     chartCard({
       title: '프로젝트 일정 (4주)',
-      subtitle: '아래 표의 입력값을 4주 구간으로 시각화합니다.',
+      subtitle: '아래 표의 입력값을 4주 구간으로 시각화',
       actions: rangeNav({
         label: `${fmtDate(start)} – ${fmtDate(end)}`,
         onPrev: () => {
@@ -75,7 +75,7 @@ export function render(ctx) {
               },
             ],
           })),
-        emptyText: '이 구간에 해당하는 프로젝트가 없습니다.',
+        emptyText: '이 구간에 해당하는 프로젝트 없음',
       }),
       table: buildTable(ctx, list),
     })
@@ -106,7 +106,7 @@ function pageHead(ctx) {
   head.innerHTML = `
     <div>
       <h1 class="page-title">Project Status</h1>
-      <p class="page-sub">진행 중인 모든 프로젝트의 기본 정보와 일정을 관리합니다. 누구나 입력·수정할 수 있습니다.</p>
+      <p class="page-sub"><span class="subline">진행 중인 모든 프로젝트의 기본 정보와 일정 관리</span><span class="subline">누구나 입력 · 수정 가능</span></p>
     </div>
   `;
   const btn = el('button', 'btn btn--primary', '+ 프로젝트 추가');
@@ -180,7 +180,7 @@ function tableCard(ctx, list) {
     <header class="card__head">
       <div class="card__titles">
         <h2 class="card__title">프로젝트 목록</h2>
-        <p class="card__sub">${list.length}건 표시 중 · 행을 클릭하면 수정할 수 있습니다.</p>
+        <p class="card__sub">${list.length}건 표시 중 · 행 클릭 시 수정</p>
       </div>
     </header>
   `;
@@ -210,7 +210,7 @@ function tableCard(ctx, list) {
       },
     ],
     list.map(toRow),
-    '조건에 맞는 프로젝트가 없습니다.'
+    '조건에 맞는 프로젝트 없음'
   );
 
   table.addEventListener('click', (e) => {
@@ -219,9 +219,9 @@ function tableCard(ctx, list) {
     if (edit) openProjectForm(ctx, store.byId('projects', edit.dataset.edit));
     if (del) {
       const p = store.byId('projects', del.dataset.del);
-      if (confirmDialog(`'${p.client} · ${p.name}' 프로젝트를 삭제할까요?\n리소스 배정과 주간 보고 연결도 함께 끊깁니다.`)) {
+      if (confirmDialog(`'${p.client} · ${p.name}' 프로젝트를 삭제할까요?\n리소스 배정과 주간 보고 연결도 함께 끊김`)) {
         store.remove('projects', p.id);
-        toast('프로젝트를 삭제했습니다.', 'info');
+        toast('프로젝트 삭제 완료', 'info');
         ctx.rerender();
       }
     }
@@ -246,7 +246,7 @@ export function openProjectForm(ctx, project) {
 
   openForm({
     title: isNew ? '프로젝트 추가' : '프로젝트 수정',
-    subtitle: '입력한 팀 구성과 기간은 Resource Planning에 자동 반영됩니다.',
+    subtitle: '입력한 팀 구성과 기간은 Resource Planning에 자동 반영',
     submitLabel: isNew ? '추가' : '저장',
     fields: [
       { name: 'client', label: '고객사 (Client)', type: 'text', required: true, placeholder: '예: 삼성전자' },
@@ -285,7 +285,7 @@ export function openProjectForm(ctx, project) {
     ],
     values: project ?? { status: '수행중', startDate: toISO(today()) },
     onSubmit: (data) => {
-      if (data.startDate > data.endDate) throw new Error('종료일이 시작일보다 빠릅니다.');
+      if (data.startDate > data.endDate) throw new Error('종료일이 시작일보다 빠름');
       const record = store.stampMeta(
         {
           id: project?.id ?? uid('prj'),
@@ -302,7 +302,7 @@ export function openProjectForm(ctx, project) {
         data.managerId
       );
       store.upsert('projects', record);
-      toast(isNew ? '프로젝트를 추가했습니다.' : '프로젝트를 저장했습니다.', 'good');
+      toast(isNew ? '프로젝트 추가 완료' : '프로젝트 저장 완료', 'good');
       ctx.rerender();
     },
   });

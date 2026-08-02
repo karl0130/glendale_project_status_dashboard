@@ -1,4 +1,8 @@
-// 상세 3 — Weekly Work Updates. 주간 업무 입력 + 직원별 주간 간트 + 상세 보고 열람.
+// 상세 3 — Weekly Work Updates. 주간 업무 입력 + 작성자·프로젝트별 주간 간트 + 상세 보고.
+//
+// 행은 (작성자 × 프로젝트) 단위다. 같은 프로젝트 안에서 업무가 여러 건이면 한 행에 모이고,
+// 기간이 겹칠 때만 그 행 안에서 줄이 나뉜다. 프로젝트가 다르면 행이 나뉜다.
+// 색은 프로젝트가 아니라 업무 '상태'를 나타낸다 — 프로젝트는 왼쪽 열이 이미 말해준다.
 
 import * as store from '../store.js';
 import { chartCard, rangeNav, renderGantt, renderLegend, renderTable } from '../gantt.js';
@@ -8,16 +12,22 @@ import {
   escapeHtml,
   fmtDate,
   fmtRange,
+  intersectRange,
   parseDate,
   startOfWeek,
+  subtractRanges,
   today,
   toISO,
   uid,
   weekLabel,
 } from '../util.js';
+import { vacationTooltip, widestIndex } from './overview.js';
 
 let anchor = null; // 표시 중인 주의 월요일
 let employeeFilter = 'all';
+
+/** 상태 → 색 토큰. 상태색은 예약 토큰이고 항상 범례의 글자와 함께 쓴다. */
+const STATUS_COLOR = { 진행중: 'st-progress', 완료: 'st-done', 지연: 'st-late' };
 
 export function render(ctx) {
   if (!anchor) anchor = startOfWeek(today());
@@ -35,46 +45,16 @@ export function render(ctx) {
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   const staff = store.employees().filter((e) => employeeFilter === 'all' || e.id === employeeFilter);
-
-  const rows = staff.map((emp) => {
-    const mine = updates.filter((u) => u.employeeId === emp.id);
-    return {
-      id: emp.id,
-      label: emp.name,
-      sub: emp.role,
-      badge: mine.length
-        ? null
-        : { tone: 'warning', icon: '●', text: '미제출' },
-      bars: mine.map((u) => {
-        const p = u.projectId ? store.byId('projects', u.projectId) : null;
-        return {
-          start: u.startDate,
-          end: u.endDate,
-          label: u.task,
-          color: p ? store.projectColor(p.id) : 0,
-          tooltip: `
-            <strong>${escapeHtml(p ? `${p.client} · ${p.name}` : '비프로젝트 업무')}</strong>
-            <span class="tooltip__title">${escapeHtml(u.task)}</span>
-            <dl class="tooltip__list">
-              <dt>기간</dt><dd>${escapeHtml(fmtRange(u.startDate, u.endDate))}</dd>
-              <dt>상태</dt><dd>${escapeHtml(u.status)}</dd>
-            </dl>
-            ${u.detail ? `<p class="tooltip__body">${escapeHtml(u.detail)}</p>` : ''}`,
-          aria: `${emp.name}, ${u.task}, ${fmtRange(u.startDate, u.endDate)}`,
-          onClick: () => openUpdateForm(ctx, u),
-        };
-      }),
-    };
-  });
-
-  const legendProjects = [
-    ...new Set(updates.map((u) => u.projectId).filter(Boolean)),
-  ].map((id) => ({ color: store.projectColor(id), label: store.byId('projects', id)?.name ?? id }));
+  const rows = buildRows(staff, updates, start, end, ctx);
 
   view.appendChild(
     chartCard({
       title: '주간 업무 현황',
-      subtitle: '직원별로 이번 주 수행 업무를 요일 단위로 표시합니다. 바를 클릭하면 수정됩니다.',
+      subtitle: [
+        '작성자 · 프로젝트별로 한 행',
+        '같은 프로젝트의 업무는 한 행에 모이고, 기간이 겹칠 때만 줄이 나뉨',
+        '휴가 기간에는 업무 바가 끊기고 그 자리에 휴가 표시',
+      ],
       actions: rangeNav({
         label: `${weekLabel(start)} (${fmtDate(start)} 주)`,
         onPrev: () => {
@@ -90,31 +70,40 @@ export function render(ctx) {
           ctx.rerender();
         },
       }),
-      legend: legendProjects.length ? renderLegend(legendProjects) : null,
+      legend: renderLegend(buildLegend(updates, rows)),
       chart: renderGantt({
         start,
         end,
-        dayWidth: 92,
-        labelHeader: '작성자',
+        dayWidth: 88,
+        columns: [
+          { label: '작성자', width: 122 },
+          { label: '고객사', width: 108 },
+          { label: '프로젝트', width: 200 },
+        ],
         rows,
-        emptyText: '이 주에 등록된 업무가 없습니다.',
+        emptyText: '이 주에 등록된 업무 없음',
       }),
       table: renderTable(
         [
           { key: 'name', label: '작성자' },
+          { key: 'client', label: '고객사' },
           { key: 'project', label: '프로젝트' },
           { key: 'task', label: '수행 업무' },
           { key: 'period', label: '기간' },
           { key: 'status', label: '상태' },
         ],
-        updates.map((u) => ({
-          name: store.employeeName(u.employeeId),
-          project: u.projectId ? store.projectLabel(u.projectId) : '비프로젝트 업무',
-          task: u.task,
-          period: fmtRange(u.startDate, u.endDate),
-          status: u.status,
-        })),
-        '이 주에 등록된 업무가 없습니다.'
+        updates.map((u) => {
+          const p = u.projectId ? store.byId('projects', u.projectId) : null;
+          return {
+            name: store.employeeName(u.employeeId),
+            client: p?.client ?? '—',
+            project: p?.name ?? '비프로젝트 업무',
+            task: u.task,
+            period: fmtRange(u.startDate, u.endDate),
+            status: u.status,
+          };
+        }),
+        '이 주에 등록된 업무 없음'
       ),
     })
   );
@@ -123,12 +112,157 @@ export function render(ctx) {
   return view;
 }
 
+// ── 행 구성 ─────────────────────────────────────────────────────────────────
+
+/** 겹치는 항목만 다른 줄로 밀어내는 그리디 배치. 줄 번호를 미리 확정해 둔다. */
+function assignLanes(items) {
+  const lanes = [];
+  for (const item of items) {
+    let index = lanes.findIndex((lane) =>
+      lane.every((other) => item.s > other.e || item.e < other.s)
+    );
+    if (index === -1) {
+      index = lanes.length;
+      lanes.push([]);
+    }
+    lanes[index].push(item);
+    item.lane = index;
+  }
+  return lanes.length || 1;
+}
+
+function buildRows(staff, updates, start, end, ctx) {
+  const rows = [];
+
+  for (const emp of staff) {
+    const mine = updates.filter((u) => u.employeeId === emp.id);
+    const vacations = store
+      .vacationBlocks(emp.id)
+      .map((v) => {
+        const hit = intersectRange(v.start, v.end, start, end);
+        return hit ? { ...v, ...hit } : null;
+      })
+      .filter(Boolean);
+
+    // 프로젝트별로 묶는다. 비프로젝트 업무는 하나의 묶음으로 모은다.
+    const groups = new Map();
+    for (const u of mine) {
+      const key = u.projectId || '__none__';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(u);
+    }
+
+    if (!groups.size) {
+      // 업무 기록이 없어도 휴가는 보여야 하고, 미제출도 드러나야 한다.
+      rows.push({
+        id: `${emp.id}::none`,
+        cells: [{ text: emp.name, sub: emp.role }, { text: '—' }, { text: '—' }],
+        badge: { tone: 'warning', icon: '●', text: '미제출' },
+        bars: vacations.map((v) => vacationBar(emp, v, 0)),
+      });
+      continue;
+    }
+
+    for (const [key, items] of groups) {
+      const p = key === '__none__' ? null : store.byId('projects', key);
+      const tasks = items
+        .map((u) => ({ u, s: parseDate(u.startDate), e: parseDate(u.endDate) }))
+        .filter((t) => t.s && t.e)
+        .sort((a, b) => a.s - b.s || a.e - b.e);
+
+      const laneCount = assignLanes(tasks);
+      const bars = [];
+
+      for (const t of tasks) {
+        const blocks = vacations
+          .map((v) => {
+            const hit = intersectRange(v.start, v.end, t.s, t.e);
+            return hit ? { ...v, ...hit } : null;
+          })
+          .filter(Boolean);
+
+        // 휴가로 쪼개진 조각 중 가장 넓은 하나만 라벨을 갖는다 — 짧은 조각의 라벨은
+        // 바깥으로 밀려 옆 블록과 겹친다 (값은 툴팁·표에 그대로 남는다).
+        const segments = subtractRanges(t.s, t.e, blocks);
+        const labelled = widestIndex(segments, start, end);
+
+        segments.forEach((seg, i) => {
+          bars.push({
+            start: seg.start,
+            end: seg.end,
+            lane: t.lane,
+            label: i === labelled ? t.u.task : '',
+            color: STATUS_COLOR[t.u.status] ?? 'st-progress',
+            tooltip: taskTooltip(p, t.u),
+            aria: `${emp.name}, ${t.u.task}, ${fmtRange(t.u.startDate, t.u.endDate)}, ${t.u.status}`,
+            onClick: () => openUpdateForm(ctx, t.u),
+          });
+        });
+      }
+
+      // 휴가는 이 행의 모든 줄에서 같은 자리에 나타난다.
+      for (let lane = 0; lane < laneCount; lane += 1) {
+        for (const v of vacations) bars.push(vacationBar(emp, v, lane));
+      }
+
+      rows.push({
+        id: `${emp.id}::${key}`,
+        cells: [
+          { text: emp.name, sub: emp.role },
+          { text: p?.client ?? '—' },
+          { text: p?.name ?? '비프로젝트 업무' },
+        ],
+        bars,
+      });
+    }
+  }
+  return rows;
+}
+
+function vacationBar(emp, block, lane) {
+  return {
+    start: block.start,
+    end: block.end,
+    lane,
+    label: block.type,
+    kind: 'vacation',
+    color: 0,
+    tooltip: vacationTooltip(emp.name, block),
+    aria: `${emp.name} ${block.type}`,
+  };
+}
+
+function taskTooltip(p, u) {
+  return `
+    <strong>${escapeHtml(p ? `${p.client} · ${p.name}` : '비프로젝트 업무')}</strong>
+    <span class="tooltip__title">${escapeHtml(u.task)}</span>
+    <dl class="tooltip__list">
+      <dt>기간</dt><dd>${escapeHtml(fmtRange(u.startDate, u.endDate))}</dd>
+      <dt>상태</dt><dd>${escapeHtml(u.status)}</dd>
+    </dl>
+    ${u.detail ? `<p class="tooltip__body">${escapeHtml(u.detail)}</p>` : ''}`;
+}
+
+/** 범례는 실제로 화면에 있는 상태만 싣는다. 휴가 블록이 있으면 그것도 함께. */
+function buildLegend(updates, rows) {
+  const present = new Set(updates.map((u) => u.status));
+  const items = ['진행중', '완료', '지연']
+    .filter((s) => present.has(s))
+    .map((s) => ({ color: STATUS_COLOR[s], label: s }));
+  if (rows.some((r) => r.bars.some((b) => b.kind === 'vacation'))) {
+    items.push({ color: 'vacation', label: '휴가' });
+  }
+  return items;
+}
+
+// ── 상단 ────────────────────────────────────────────────────────────────────
+
 function pageHead(ctx, start) {
   const head = el('div', 'page-head');
   head.innerHTML = `
     <div>
       <h1 class="page-title">Weekly Work Updates</h1>
-      <p class="page-sub">주간 수행 업무를 기입하면 요일별 간트와 상세 보고로 함께 정리됩니다.</p>
+      <p class="page-sub"><span class="subline">주간 수행 업무 기입</span><span class="subline">요일별 간트와 상세 보고로 자동 정리</span></p>
     </div>
   `;
   const btn = el('button', 'btn btn--primary', '+ 주간 업무 기입');
@@ -188,7 +322,7 @@ function detailCard(ctx, staff, updates) {
     <header class="card__head">
       <div class="card__titles">
         <h2 class="card__title">주간 보고 상세</h2>
-        <p class="card__sub">작성자별 상세 기입 내용입니다.</p>
+        <p class="card__sub">작성자별 상세 기입 내용</p>
       </div>
     </header>
   `;
@@ -196,7 +330,7 @@ function detailCard(ctx, staff, updates) {
 
   const withWork = staff.filter((e) => updates.some((u) => u.employeeId === e.id));
   if (!withWork.length) {
-    body.appendChild(el('p', 'empty', '이 주에 등록된 보고가 없습니다.'));
+    body.appendChild(el('p', 'empty', '이 주에 등록된 보고 없음'));
   }
 
   for (const emp of withWork) {
@@ -208,7 +342,7 @@ function detailCard(ctx, staff, updates) {
       const item = el('li', 'report__item');
       item.innerHTML = `
         <div class="report__head">
-          <span class="swatch swatch--c${p ? store.projectColor(p.id) : 0}" aria-hidden="true"></span>
+          <span class="swatch swatch--${STATUS_COLOR[u.status] ?? 'st-progress'}" aria-hidden="true"></span>
           <span class="report__project">${escapeHtml(p ? `${p.client} · ${p.name}` : '비프로젝트 업무')}</span>
           <span class="pill pill--${u.status === '완료' ? 'done' : u.status === '지연' ? 'hold' : 'running'}">${escapeHtml(u.status)}</span>
           <span class="report__period">${escapeHtml(fmtRange(u.startDate, u.endDate))}</span>
@@ -232,7 +366,7 @@ function detailCard(ctx, staff, updates) {
     if (edit) openUpdateForm(ctx, store.byId('weeklyUpdates', edit.dataset.edit));
     if (del && confirmDialog('이 주간 업무 기록을 삭제할까요?')) {
       store.remove('weeklyUpdates', del.dataset.del);
-      toast('삭제했습니다.', 'info');
+      toast('삭제 완료', 'info');
       ctx.rerender();
     }
   });
@@ -249,7 +383,7 @@ export function openUpdateForm(ctx, update, weekStart) {
 
   openForm({
     title: isNew ? '주간 업무 기입' : '주간 업무 수정',
-    subtitle: '한 건씩 기입합니다. 수행 기간을 요일 단위로 지정하면 간트에 그대로 표시됩니다.',
+    subtitle: '한 건씩 기입 · 수행 기간을 요일 단위로 지정하면 간트에 그대로 표시',
     submitLabel: isNew ? '기입' : '저장',
     fields: [
       {
@@ -264,20 +398,27 @@ export function openUpdateForm(ctx, update, weekStart) {
         label: '프로젝트',
         type: 'select',
         allowEmpty: true,
-        hint: '비워두면 비프로젝트 업무로 기록됩니다.',
+        hint: '비워두면 비프로젝트 업무로 기록',
         options: store
           .projects()
           .filter((p) => p.status !== '종료')
           .map((p) => ({ value: p.id, label: `${p.client} · ${p.name}` })),
       },
-      { name: 'task', label: '수행 업무', type: 'text', required: true, colspan: 2, placeholder: '예: 고객사 인터뷰 5건 진행 및 시사점 정리' },
+      {
+        name: 'task',
+        label: '수행 업무',
+        type: 'text',
+        required: true,
+        colspan: 2,
+        placeholder: '예: 고객사 인터뷰 5건 진행 및 시사점 정리',
+      },
       {
         name: 'detail',
         label: '상세 내용',
         type: 'textarea',
         rows: 5,
         colspan: 2,
-        hint: '결과물, 진행 상황, 이슈, 다음 주 계획 등을 구체적으로 적습니다.',
+        hint: '결과물 · 진행 상황 · 이슈 · 다음 주 계획 등 구체적으로 기입',
       },
       { name: 'startDate', label: '시작일', type: 'date', required: true },
       { name: 'endDate', label: '종료일', type: 'date', required: true },
@@ -295,7 +436,7 @@ export function openUpdateForm(ctx, update, weekStart) {
       endDate: toISO(addDays(monday, 4)),
     },
     onSubmit: (data) => {
-      if (data.startDate > data.endDate) throw new Error('종료일이 시작일보다 빠릅니다.');
+      if (data.startDate > data.endDate) throw new Error('종료일이 시작일보다 빠름');
       store.upsert('weeklyUpdates', {
         id: update?.id ?? uid('wu'),
         employeeId: data.employeeId,
@@ -308,7 +449,7 @@ export function openUpdateForm(ctx, update, weekStart) {
       });
       // 기입한 주로 화면을 옮겨 방금 넣은 항목이 바로 보이게 한다.
       anchor = startOfWeek(parseDate(data.startDate));
-      toast(isNew ? '주간 업무를 기입했습니다.' : '저장했습니다.', 'good');
+      toast(isNew ? '주간 업무 기입 완료' : '저장 완료', 'good');
       ctx.rerender();
     },
   });
