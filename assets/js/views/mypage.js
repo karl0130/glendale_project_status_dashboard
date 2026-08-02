@@ -8,6 +8,7 @@ import { LEAVE_POLICY } from '../config.js';
 import { renderTable } from '../gantt.js';
 import { confirmDialog, el, openForm, toast } from '../ui.js';
 import { escapeHtml, fmtDate, fmtRange, parseDate } from '../util.js';
+import { notifyVacationDecided } from '../notify.js';
 import { openVacationForm } from './vacations.js';
 
 export function render(ctx) {
@@ -132,6 +133,7 @@ function approvalCard(ctx, me) {
       store.decideVacation(v.id, '승인', me.id);
       toast('승인했습니다', 'good');
       ctx.rerender();
+      notifyDecision(v.id, '승인', me);
     }
     if (reject) {
       const v = store.byId('vacations', reject.dataset.reject);
@@ -146,6 +148,7 @@ function approvalCard(ctx, me) {
           store.decideVacation(v.id, '반려', me.id, data.reason);
           toast('반려했습니다', 'info');
           ctx.rerender();
+          notifyDecision(v.id, '반려', me);
         },
       });
     }
@@ -310,4 +313,17 @@ function myVacationsCard(ctx, me) {
 
 function statusTone(status) {
   return { 신청: 'hold', 승인: 'won', 반려: 'done' }[status] ?? 'neutral';
+}
+
+/**
+ * 결재 결과를 신청자에게 알린다.
+ * 저장 뒤에 부르므로 decideVacation 이 남긴 사유·처리자까지 반영된 레코드가 나간다.
+ * 실패해도 결재 자체는 이미 끝났으므로 그 사실만 구분해 알린다.
+ */
+function notifyDecision(id, decision, decidedBy) {
+  if (store.source() !== 'sheets') return;
+  notifyVacationDecided(store.byId('vacations', id), decision, decidedBy).then((res) => {
+    if (res.ok) toast('신청자에게 결과 메일을 보냈습니다', 'good');
+    else toast(`${decision} 처리는 완료 · 메일 발송 실패 — ${res.error}`, 'warning');
+  });
 }

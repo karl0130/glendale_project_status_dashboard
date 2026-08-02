@@ -169,6 +169,11 @@ data/*.json
 
 - **승인권자**는 `employees` 탭의 `canApprove` 가 `TRUE` 인 사람. 상단 계정 아이콘에
   대기 건수가 배지로 뜬다.
+- **메일 알림**이 자동으로 나간다. 신청하면 승인권자에게, 승인·반려하면 신청자에게.
+  Gmail API 를 브라우저에서 직접 호출하므로 서버도 외부 메일 서비스도 필요 없다.
+  발신자는 **그 동작을 한 사람의 계정**이다 (신청 알림은 신청자, 결재 알림은 승인권자).
+  메일 실패가 신청·결재를 막지 않는다 — 저장은 이미 끝났고, 화면이 "저장은 됐고 메일만
+  안 갔다" 를 구분해 알린다. 받는 사람의 `email` 이 비어 있으면 발송을 시도하지 않는다.
 - **승인권자 본인의 휴가는 신청 단계 없이 바로 승인**된다. 자기가 자기를 승인하는
   화면은 의미가 없다.
 - 신청 · 수정 · 취소는 **My Page 에서만** 한다. `휴가 관리` 탭은 팀 전체가 보는
@@ -247,10 +252,12 @@ Apps Script 웹앱을 중계로 두고 팀원에게서 시트 권한 자체를 �
 
 ## 최초 세팅 (한 번만)
 
-1. **Google Cloud Console** — 프로젝트 생성 → `Google Sheets API` 사용 설정 →
+1. **Google Cloud Console** — 프로젝트 생성 → **`Google Sheets API` 와 `Gmail API` 사용 설정** →
    OAuth 동의 화면 **Internal** → 사용자 인증 정보에서 **웹 애플리케이션** 클라이언트 생성.
    승인된 JavaScript 원본에 `https://<계정>.github.io` 와 `http://localhost:8000` 등록.
    리디렉션 URI 는 비워둔다.
+   요청 범위는 `spreadsheets` · `userinfo.email` · `gmail.send` 세 개다. `gmail.send` 는
+   민감 스코프지만 Internal 앱이라 구글 검토가 필요 없다.
 2. 발급된 **클라이언트 ID** 와 스프레드시트 ID 를 `assets/js/config.js` 에 넣는다.
 3. 스프레드시트를 팀원에게 **편집 권한**으로 공유한다.
 4. 대시보드에서 구글 로그인 → `설정` → **시트 초기화** 를 한 번 누른다.
@@ -266,6 +273,8 @@ Apps Script 웹앱을 중계로 두고 팀원에게서 시트 권한 자체를 �
 - `assets/js/config.js` — 클라이언트 ID · 시트 ID · 탭과 열 정의
 - `assets/js/google/auth.js` — 토큰 발급 · 갱신 · 로그인 상태
 - `assets/js/google/sheets.js` — 시트 행 ↔ 객체 변환, 읽기/쓰기/초기화
+- `assets/js/google/mail.js` — Gmail API 발송 (MIME 조립 · 한글 헤더 인코딩)
+- `assets/js/notify.js` — 휴가 알림 메일 문안
 
 다른 백엔드(Supabase, Cloudflare D1 등)로 옮길 때도 `store.js` 의 `pull` / `pushCollection`
 두 곳만 바꾸면 된다.

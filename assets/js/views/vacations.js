@@ -18,6 +18,7 @@ import {
   uid,
 } from '../util.js';
 import { businessDays } from '../holidays.js';
+import { notifyVacationRequested } from '../notify.js';
 import { vacationTooltip } from './overview.js';
 
 let anchor = null; // 표시 중인 달의 1일
@@ -317,8 +318,7 @@ export function openVacationForm(ctx, vacation, { employeeId = '' } = {}) {
           ? '승인'
           : '신청';
       const stamp = toISO(today());
-
-      store.upsert('vacations', {
+      const record = {
         id: vacation?.id ?? uid('vac'),
         employeeId: applicantId,
         type: data.type,
@@ -330,7 +330,8 @@ export function openVacationForm(ctx, vacation, { employeeId = '' } = {}) {
         decidedBy: vacation?.decidedBy ?? (status === '승인' ? me?.id ?? applicant?.id ?? '' : ''),
         decidedAt: vacation?.decidedAt ?? (status === '승인' ? stamp : ''),
         decisionNote: vacation?.decisionNote ?? '',
-      });
+      };
+      store.upsert('vacations', record);
 
       anchor = startOfMonth(parseDate(data.startDate)); // 신청한 달로 화면을 옮긴다
       toast(
@@ -338,6 +339,15 @@ export function openVacationForm(ctx, vacation, { employeeId = '' } = {}) {
         'good'
       );
       ctx.rerender();
+
+      // 메일은 부수적인 일이다. 실패해도 신청은 이미 저장돼 있으므로 막지 않고,
+      // 대신 "저장은 됐고 메일만 안 갔다" 를 분명히 알린다.
+      if (isNew && status === '신청' && store.source() === 'sheets') {
+        notifyVacationRequested(record).then((res) => {
+          if (res.ok) toast('승인권자에게 알림 메일을 보냈습니다', 'good');
+          else toast(`신청은 저장됨 · 메일 발송 실패 — ${res.error}`, 'warning');
+        });
+      }
     },
   });
 }

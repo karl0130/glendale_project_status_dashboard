@@ -10,9 +10,12 @@ export const GOOGLE = {
   clientId: '319006066033-nlim9nfk5og7qii0h00242jcnt87oqv9.apps.googleusercontent.com',
   spreadsheetId: '1KR6pc9w2tyRvYhN-DNkkxPlWOv5Pr3DH9esVpRO6kzY',
   // userinfo.email 은 로그인한 사람이 employees 의 누구인지 맞추는 데 쓴다.
+  // gmail.send 는 휴가 신청·결재 알림 메일용. 민감 스코프지만 Internal 앱이라
+  // 구글 검토 없이 쓸 수 있다. 읽기 권한은 요구하지 않는다 — 보내기만 한다.
   scope: [
     'https://www.googleapis.com/auth/spreadsheets',
     'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/gmail.send',
   ].join(' '),
 };
 
