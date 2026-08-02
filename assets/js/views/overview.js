@@ -127,7 +127,7 @@ function vacationCard(weekStart, weekEnd) {
   card.innerHTML = `
     <header class="card__head">
       <div class="card__titles">
-        <h2 class="card__title">금주 휴가</h2>
+        <h2 class="card__title">금주 휴가 일정</h2>
         <p class="card__sub">${escapeHtml(weekLabel(weekStart))} (월–일) 기준 · 총 ${new Set(list.map((v) => v.employeeId)).size}명</p>
       </div>
     </header>
@@ -205,8 +205,8 @@ function ongoingProjects(start, end, nav) {
   }));
 
   return chartCard({
-    title: 'Ongoing Projects',
-    subtitle: '수주 · 수행 중 프로젝트 2주 구간',
+    title: 'Ongoing Projects (2주)',
+    subtitle: '수주 · 수행 중 프로젝트',
     actions: nav,
     legend: list.length
       ? renderLegend(list.map((p) => ({ color: store.projectColor(p.id), label: p.name })))
@@ -423,11 +423,8 @@ function resourcePlan(start, end, nav) {
   legendItems.push({ color: 'vacation', label: '휴가' });
 
   return chartCard({
-    title: 'Resource Planning',
-    subtitle: [
-      'Project Status 입력값에서 자동 산출',
-      '휴가 기간에는 프로젝트 바가 끊기고 그 자리에 휴가 표시',
-    ],
+    title: 'Resource Planning (2주)',
+    subtitle: '인원별 프로젝트 일정',
     actions: nav,
     legend: renderLegend(legendItems),
     chart: renderGantt({

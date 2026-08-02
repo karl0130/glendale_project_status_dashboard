@@ -42,7 +42,7 @@ function pageHead(ctx) {
   head.innerHTML = `
     <div>
       <h1 class="page-title">휴가 관리</h1>
-      <p class="page-sub"><span class="subline">휴가 신청 · 수정 · 삭제</span><span class="subline">등록 즉시 Overview 금주 휴가 표와 Resource Planning 간트에 자동 반영</span></p>
+      <p class="page-sub">휴가 신청 및 일정 관리</p>
     </div>
   `;
   const btn = el('button', 'btn btn--primary', '+ 휴가 신청');
@@ -103,7 +103,7 @@ function monthCard(ctx, start, end) {
 
   return chartCard({
     title: `월간 휴가 현황 — ${start.getFullYear()}년 ${start.getMonth() + 1}월`,
-    subtitle: '바 클릭 시 수정',
+    subtitle: '※차트 내 바 클릭하여 수정·삭제 가능',
     actions: rangeNav({
       label: `${start.getFullYear()}. ${String(start.getMonth() + 1).padStart(2, '0')}`,
       onPrev: () => {

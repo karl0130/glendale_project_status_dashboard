@@ -50,11 +50,6 @@ export function render(ctx) {
   view.appendChild(
     chartCard({
       title: '주간 업무 현황',
-      subtitle: [
-        '작성자 · 프로젝트별로 한 행',
-        '같은 프로젝트의 업무는 한 행에 모이고, 기간이 겹칠 때만 줄이 나뉨',
-        '휴가 기간에는 업무 바가 끊기고 그 자리에 휴가 표시',
-      ],
       actions: rangeNav({
         label: `${weekLabel(start)} (${fmtDate(start)} 주)`,
         onPrev: () => {
@@ -286,7 +281,7 @@ function pageHead(ctx, start) {
   head.innerHTML = `
     <div>
       <h1 class="page-title">Weekly Work Updates</h1>
-      <p class="page-sub"><span class="subline">주간 수행 업무 기입</span><span class="subline">요일별 간트와 상세 보고로 자동 정리</span></p>
+      <p class="page-sub">주간 수행 업무 Check-Up</p>
     </div>
   `;
   const btn = el('button', 'btn btn--primary', '+ 주간 업무 기입');
@@ -345,8 +340,8 @@ function detailCard(ctx, staff, updates) {
   card.innerHTML = `
     <header class="card__head">
       <div class="card__titles">
-        <h2 class="card__title">주간 보고 상세</h2>
-        <p class="card__sub">작성자별 상세 기입 내용</p>
+        <h2 class="card__title">주간 상세 업무 보고</h2>
+        <p class="card__sub">인원별 상세 업무 진행 상황</p>
       </div>
     </header>
   `;
@@ -442,7 +437,7 @@ export function openUpdateForm(ctx, update, weekStart) {
         type: 'textarea',
         rows: 5,
         colspan: 2,
-        hint: '결과물 · 진행 상황 · 이슈 · 다음 주 계획 등 구체적으로 기입',
+        hint: '결과물 · 진행 상황 · 이슈 등 필요 시 구체적인 사항 기입',
       },
       { name: 'startDate', label: '시작일', type: 'date', required: true },
       { name: 'endDate', label: '종료일', type: 'date', required: true },

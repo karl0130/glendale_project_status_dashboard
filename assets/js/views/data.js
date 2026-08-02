@@ -28,7 +28,7 @@ function pageHead() {
   head.innerHTML = `
     <div>
       <h1 class="page-title">데이터 &amp; 아카이브</h1>
-      <p class="page-sub"><span class="subline">입력한 내용을 팀에 반영</span><span class="subline">시점별 스냅샷 보관</span></p>
+      <p class="page-sub">대시보드 데이터 관리 및 아카이브</p>
     </div>
   `;
   return head;

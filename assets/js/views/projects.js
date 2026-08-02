@@ -33,7 +33,6 @@ export function render(ctx) {
   view.appendChild(
     chartCard({
       title: '프로젝트 일정 (4주)',
-      subtitle: '아래 표의 입력값을 4주 구간으로 시각화',
       actions: rangeNav({
         label: `${fmtDate(start)} – ${fmtDate(end)}`,
         onPrev: () => {
@@ -106,7 +105,7 @@ function pageHead(ctx) {
   head.innerHTML = `
     <div>
       <h1 class="page-title">Project Status</h1>
-      <p class="page-sub"><span class="subline">진행 중인 모든 프로젝트의 기본 정보와 일정 관리</span><span class="subline">누구나 입력 · 수정 가능</span></p>
+      <p class="page-sub">진행 중·예정 모든 프로젝트 정보 및 일정 관리</p>
     </div>
   `;
   const btn = el('button', 'btn btn--primary', '+ 프로젝트 추가');
