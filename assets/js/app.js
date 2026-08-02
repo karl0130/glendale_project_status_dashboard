@@ -65,7 +65,7 @@ const ctx = {
 function paint() {
   hideTooltip();
   const route = currentRoute();
-  document.title = `${route.label} · Glendale Korea Project Dashboard`;
+  document.title = `${route.label} · Glendale Korea`;
 
   app.innerHTML = '';
   app.appendChild(topbar());
@@ -118,11 +118,11 @@ async function connect({ interactive = false } = {}) {
 function topbar() {
   const bar = el('header', 'topbar');
   bar.innerHTML = `
-    <div class="brand">
+    <a class="brand" href="#/overview" aria-label="Overview 로 이동">
       <img class="brand__logo" src="assets/img/logo.png" alt="Glendale Korea" />
       <span class="brand__divider" aria-hidden="true"></span>
-      <h1 class="brand__title">Glendale Korea Project Dashboard</h1>
-    </div>
+      <h1 class="brand__title">Project Dashboard</h1>
+    </a>
     <div class="topbar__meta"></div>
   `;
 
@@ -213,6 +213,20 @@ function sidebar(active) {
   nav.appendChild(navGroup('메인', main, active));
   nav.appendChild(navGroup('상세', details, active));
   nav.appendChild(navGroup('관리', utils, active));
+
+  // 로그아웃은 드물게 쓰는 동작이라 맨 아래 조용한 자리에 둔다.
+  if (store.source() === 'sheets') {
+    const foot = el('div', 'sidebar__foot');
+    const out = el('button', 'sidebar__logout', '로그아웃');
+    out.addEventListener('click', () => {
+      store.disconnect();
+      toast('연결을 끊었습니다', 'info');
+      ctx.navigate('overview');
+    });
+    foot.appendChild(out);
+    nav.appendChild(foot);
+  }
+
   return nav;
 }
 

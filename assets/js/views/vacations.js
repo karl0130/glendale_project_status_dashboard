@@ -219,7 +219,18 @@ function listCard(ctx) {
 export function openVacationForm(ctx, vacation, { employeeId = '' } = {}) {
   const isNew = !vacation;
   const me = store.currentEmployee();
-  const preset = vacation?.employeeId || employeeId || me?.id || '';
+  const applicantId = vacation?.employeeId || employeeId || me?.id || '';
+  const applicant = store.byId('employees', applicantId);
+
+  if (!applicant) {
+    toast('로그인한 계정에 해당하는 직원을 찾을 수 없습니다', 'warning');
+    return;
+  }
+
+  // 수정 중이라면 그 건이 이미 잔여에서 빠져 있으므로 되돌려 놓고 한도를 계산한다.
+  const balance = store.leaveBalance(applicantId, parseDate(vacation?.startDate) ?? today());
+  const alreadyCounted = vacation ? store.leaveCost(vacation) : 0;
+  const availableDays = balance.remaining + alreadyCounted;
 
   openForm({
     title: isNew ? '휴가 신청' : '휴가 수정',
@@ -228,12 +239,18 @@ export function openVacationForm(ctx, vacation, { employeeId = '' } = {}) {
       : '신청 후 승인권자의 승인이 필요',
     submitLabel: isNew ? '신청' : '저장',
     fields: [
+      // 신청자는 고를 수 없다. 남의 휴가를 대신 신청하는 경로를 만들지 않는다.
       {
-        name: 'employeeId',
+        name: 'applicant',
         label: '신청자',
-        type: 'select',
-        required: true,
-        options: store.employees().map((e) => ({ value: e.id, label: `${e.name} (${e.role})` })),
+        type: 'readonly',
+        value: applicant ? `${applicant.name} (${applicant.role})` : '—',
+      },
+      {
+        name: 'available',
+        label: '신청 가능 일수',
+        type: 'readonly',
+        value: `${availableDays}일 (부여 ${balance.total}일 · 사용 ${balance.used}일 · 대기 ${balance.pending}일)`,
       },
       {
         name: 'type',
@@ -252,12 +269,7 @@ export function openVacationForm(ctx, vacation, { employeeId = '' } = {}) {
       },
       { name: 'note', label: '사유 / 비고', type: 'text', colspan: 2 },
     ],
-    values: vacation ?? {
-      employeeId: preset,
-      type: '연차',
-      startDate: toISO(today()),
-      endDate: toISO(today()),
-    },
+    values: vacation ?? { type: '연차', startDate: toISO(today()), endDate: toISO(today()) },
     // 수정 모드에서만 삭제 버튼을 붙인다. 새로 신청하는 중에는 지울 대상이 없다.
     onDelete: vacation
       ? () => {
@@ -272,11 +284,25 @@ export function openVacationForm(ctx, vacation, { employeeId = '' } = {}) {
       : null,
     onSubmit: (data) => {
       if (data.startDate > data.endDate) throw new Error('종료일이 시작일보다 빠름');
+
+      // 부여된 연차를 넘겨 신청할 수 없다. 공가처럼 차감 없는 유형은 이 검사를 통과한다.
+      const cost = store.leaveCost({
+        type: data.type,
+        startDate: data.startDate,
+        endDate: data.endDate,
+      });
+      if (cost > availableDays) {
+        throw new Error(
+          `신청 가능 일수를 초과함 — 신청 ${cost}일 / 가능 ${availableDays}일 ` +
+            `(부여 ${balance.total} · 사용 ${balance.used} · 대기 ${balance.pending})`
+        );
+      }
+
       const clash = store
         .all('vacations')
         .find(
           (v) =>
-            v.employeeId === data.employeeId &&
+            v.employeeId === applicantId &&
             v.id !== vacation?.id &&
             v.startDate <= data.endDate &&
             data.startDate <= v.endDate
@@ -284,16 +310,22 @@ export function openVacationForm(ctx, vacation, { employeeId = '' } = {}) {
       if (clash) {
         throw new Error(`이미 등록된 휴가와 겹침 — ${fmtRange(clash.startDate, clash.endDate)} ${clash.type}`);
       }
-      // 승인권자가 올리는 건은 승인 단계를 거치지 않는다.
+      // 승인권자 본인의 신청은 승인 단계를 거치지 않는다.
       // 수정일 때는 기존 상태를 유지한다 — 승인된 건을 고쳤다고 다시 대기로 돌리지 않는다.
-      const applicant = store.byId('employees', data.employeeId);
-      const autoApprove = store.canApprove(applicant) || store.canApprove(me);
-      const status = vacation ? store.vacationStatus(vacation) : autoApprove ? '승인' : '신청';
+      const status = vacation
+        ? store.vacationStatus(vacation)
+        : store.canApprove(applicant)
+          ? '승인'
+          : '신청';
       const stamp = toISO(today());
 
       store.upsert('vacations', {
         id: vacation?.id ?? uid('vac'),
-        ...data,
+        employeeId: applicantId,
+        type: data.type,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        note: data.note,
         status,
         requestedAt: vacation?.requestedAt || stamp,
         decidedBy: vacation?.decidedBy ?? (status === '승인' ? me?.id ?? applicant?.id ?? '' : ''),

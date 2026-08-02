@@ -57,25 +57,11 @@ function pageHead(me, ctx) {
       }</p>
     </div>
   `;
-  const tools = el('div', 'card__tools');
-
   if (me) {
     const request = el('button', 'btn btn--primary', '+ 휴가 신청');
     request.addEventListener('click', () => openVacationForm(ctx, null, { employeeId: me.id }));
-    tools.appendChild(request);
+    head.appendChild(request);
   }
-
-  if (store.source() === 'sheets') {
-    const out = el('button', 'btn btn--ghost', '로그아웃');
-    out.addEventListener('click', () => {
-      store.disconnect();
-      toast('연결을 끊었습니다', 'info');
-      ctx.navigate('overview');
-    });
-    tools.appendChild(out);
-  }
-
-  head.appendChild(tools);
   return head;
 }
 

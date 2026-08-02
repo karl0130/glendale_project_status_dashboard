@@ -168,11 +168,22 @@ code {
   color: #fff;
 }
 
+/* 로고와 제목 전체가 Overview 로 가는 링크다 — 대시보드의 홈 버튼. */
 .brand {
   display: flex;
   align-items: center;
   gap: 16px;
   min-width: 0;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  margin-left: -8px;
+}
+.brand:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.brand:hover .brand__title {
+  color: #ffffff;
 }
 
 /* 로고는 배경이 투명하고 워드마크가 흰색이라 짙은 파랑 위에서만 제대로 읽힌다. */
@@ -189,11 +200,13 @@ code {
   background: rgba(255, 255, 255, 0.28);
 }
 
+/* 로고 워드마크가 이미 회사명을 말하고 있다. 제목은 그 옆에서 조용히 받쳐주는 크기로
+   — 로고 글자 높이에 맞춘다. */
 .brand__title {
-  font-size: 27px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: #ffffff;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.94);
 }
 
 .topbar__meta {
@@ -379,6 +392,30 @@ button.savestate:hover {
   background: var(--surface-sunken);
   border-right: 1px solid var(--hairline);
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 로그아웃 자리 — 맨 아래로 밀어 붙인다. 자주 쓰는 것이 아니다. */
+.sidebar__foot {
+  margin-top: auto;
+  padding-top: 20px;
+}
+.sidebar__logout {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--ink-muted);
+  background: none;
+  border: none;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  width: 100%;
+  text-align: left;
+}
+.sidebar__logout:hover {
+  background: var(--surface-hover);
+  color: var(--ink-secondary);
 }
 
 .navgroup + .navgroup {
@@ -1669,7 +1706,7 @@ textarea:focus {
     flex-wrap: wrap;
   }
   .brand__title {
-    font-size: 20px;
+    font-size: 16px;
   }
   .overview-top__stats {
     grid-template-columns: 1fr;
