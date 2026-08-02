@@ -880,6 +880,31 @@ textarea:focus {
   font-weight: 400;
   color: var(--ink-secondary);
 }
+
+/* 한 행 안에서 레인별로 쪼개지는 열 (예: 작성자 한 명의 프로젝트 2개).
+   각 줄은 대응하는 바 레인과 같은 y좌표에 놓여 세로로 정확히 맞물린다. */
+.gantt__labelcol--lanes {
+  display: block;
+  position: sticky;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.gantt__laneline {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.gantt__laneline + .gantt__laneline::before {
+  content: '';
+  position: absolute;
+  top: calc(-1 * var(--lane-gap, 4px) / 2 - 0.5px);
+  left: -14px;
+  right: -14px;
+  border-top: 1px solid var(--gridline);
+}
 .gantt__rowsub {
   font-size: 11.5px;
   color: var(--ink-muted);

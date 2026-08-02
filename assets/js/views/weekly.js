@@ -76,11 +76,12 @@ export function render(ctx) {
         end,
         dayWidth: 88,
         columns: [
-          { label: '작성자', width: 122 },
+          { label: '작성자', width: 146 },
           { label: '고객사', width: 108 },
-          { label: '프로젝트', width: 200 },
+          { label: '프로젝트', width: 196 },
         ],
         rows,
+        uniformRows: true, // 사람마다 줄 수가 달라도 행 높이는 동일하게
         emptyText: '이 주에 등록된 업무 없음',
       }),
       table: renderTable(
@@ -131,6 +132,13 @@ function assignLanes(items) {
   return lanes.length || 1;
 }
 
+/**
+ * 행은 작성자 한 명당 하나다.
+ * 한 사람이 프로젝트를 둘 이상 하면 그 행 안에서 프로젝트마다 줄(레인)이 나뉘고,
+ * 고객사·프로젝트 열도 같은 줄 위치에 맞춰 쪼개진다. 작성자 이름은 행에 한 번만 나온다.
+ * 같은 프로젝트 안에서 기간이 겹치는 업무가 있으면 그 프로젝트가 줄을 하나 더 쓰지만,
+ * 라벨은 그 줄 묶음 전체에 걸쳐 한 번만 표시한다 (반복하면 다른 프로젝트로 오독된다).
+ */
 function buildRows(staff, updates, start, end, ctx) {
   const rows = [];
 
@@ -144,18 +152,10 @@ function buildRows(staff, updates, start, end, ctx) {
       })
       .filter(Boolean);
 
-    // 프로젝트별로 묶는다. 비프로젝트 업무는 하나의 묶음으로 모은다.
-    const groups = new Map();
-    for (const u of mine) {
-      const key = u.projectId || '__none__';
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(u);
-    }
-
-    if (!groups.size) {
+    if (!mine.length) {
       // 업무 기록이 없어도 휴가는 보여야 하고, 미제출도 드러나야 한다.
       rows.push({
-        id: `${emp.id}::none`,
+        id: emp.id,
         cells: [{ text: emp.name, sub: emp.role }, { text: '—' }, { text: '—' }],
         badge: { tone: 'warning', icon: '●', text: '미제출' },
         bars: vacations.map((v) => vacationBar(emp, v, 0)),
@@ -163,17 +163,37 @@ function buildRows(staff, updates, start, end, ctx) {
       continue;
     }
 
-    for (const [key, items] of groups) {
-      const p = key === '__none__' ? null : store.byId('projects', key);
-      const tasks = items
-        .map((u) => ({ u, s: parseDate(u.startDate), e: parseDate(u.endDate) }))
-        .filter((t) => t.s && t.e)
-        .sort((a, b) => a.s - b.s || a.e - b.e);
+    // 프로젝트별로 묶는다. 비프로젝트 업무는 하나의 묶음으로 모은다.
+    const grouped = new Map();
+    for (const u of mine) {
+      const key = u.projectId || '__none__';
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(u);
+    }
 
-      const laneCount = assignLanes(tasks);
-      const bars = [];
+    const bars = [];
+    const clientLines = [];
+    const projectLines = [];
+    let baseLane = 0;
 
-      for (const t of tasks) {
+    // 프로젝트 순서는 그 주에 처음 착수한 순서
+    const groups = [...grouped.entries()]
+      .map(([key, items]) => ({
+        key,
+        project: key === '__none__' ? null : store.byId('projects', key),
+        tasks: items
+          .map((u) => ({ u, s: parseDate(u.startDate), e: parseDate(u.endDate) }))
+          .filter((t) => t.s && t.e)
+          .sort((a, b) => a.s - b.s || a.e - b.e),
+      }))
+      .filter((g) => g.tasks.length)
+      .sort((a, b) => a.tasks[0].s - b.tasks[0].s);
+
+    for (const group of groups) {
+      const p = group.project;
+      const laneCount = assignLanes(group.tasks);
+
+      for (const t of group.tasks) {
         const blocks = vacations
           .map((v) => {
             const hit = intersectRange(v.start, v.end, t.s, t.e);
@@ -190,7 +210,7 @@ function buildRows(staff, updates, start, end, ctx) {
           bars.push({
             start: seg.start,
             end: seg.end,
-            lane: t.lane,
+            lane: baseLane + t.lane,
             label: i === labelled ? t.u.task : '',
             color: STATUS_COLOR[t.u.status] ?? 'st-progress',
             tooltip: taskTooltip(p, t.u),
@@ -200,21 +220,25 @@ function buildRows(staff, updates, start, end, ctx) {
         });
       }
 
-      // 휴가는 이 행의 모든 줄에서 같은 자리에 나타난다.
-      for (let lane = 0; lane < laneCount; lane += 1) {
-        for (const v of vacations) bars.push(vacationBar(emp, v, lane));
-      }
-
-      rows.push({
-        id: `${emp.id}::${key}`,
-        cells: [
-          { text: emp.name, sub: emp.role },
-          { text: p?.client ?? '—' },
-          { text: p?.name ?? '비프로젝트 업무' },
-        ],
-        bars,
-      });
+      clientLines.push({ text: p?.client ?? '—', lane: baseLane, span: laneCount });
+      projectLines.push({ text: p?.name ?? '비프로젝트 업무', lane: baseLane, span: laneCount });
+      baseLane += laneCount;
     }
+
+    // 휴가는 그 사람의 모든 줄에서 같은 자리에 나타난다.
+    for (let lane = 0; lane < baseLane; lane += 1) {
+      for (const v of vacations) bars.push(vacationBar(emp, v, lane));
+    }
+
+    rows.push({
+      id: emp.id,
+      cells: [
+        { text: emp.name, sub: emp.role },
+        { lines: clientLines },
+        { lines: projectLines },
+      ],
+      bars,
+    });
   }
   return rows;
 }

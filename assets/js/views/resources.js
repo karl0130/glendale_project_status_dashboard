@@ -54,6 +54,7 @@ export function render(ctx) {
         dayWidth: 30,
         labelHeader: '인력',
         rows,
+        uniformRows: true, // 사람마다 투입 프로젝트 수가 달라도 행 높이는 동일하게
         emptyText: '등록된 인력 없음',
       }),
       table: resourceTable(rows, start, end),

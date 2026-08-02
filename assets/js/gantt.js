@@ -89,6 +89,7 @@ function packLanes(bars) {
  * @param {Array}    opts.rows         [{ id, label, sub, cells, badge, bars }]
  * @param {string}   opts.emptyText    행이 없을 때 문구
  * @param {number}   opts.dayWidth     하루 최소 폭(px)
+ * @param {boolean}  opts.uniformRows  모든 행 높이를 가장 높은 행에 맞춤
  */
 export function renderGantt({
   start,
@@ -98,6 +99,7 @@ export function renderGantt({
   rows = [],
   emptyText = '표시할 항목이 없습니다.',
   dayWidth = 34,
+  uniformRows = false,
 }) {
   const cols = columns ?? [{ label: labelHeader, width: 218 }];
   const offsets = [];
@@ -163,7 +165,8 @@ export function renderGantt({
   const body = el('div', 'gantt__body');
   if (!rows.length) body.appendChild(el('div', 'gantt__empty', escapeHtml(emptyText)));
 
-  for (const row of rows) {
+  // 1패스 — 바를 구간에 맞춰 자르고 레인을 확정해 각 행의 자연 높이를 구한다.
+  const prepared = rows.map((row) => {
     const cells = row.cells ?? [{ text: row.label, sub: row.sub }];
 
     const bars = (row.bars ?? [])
@@ -183,7 +186,23 @@ export function renderGantt({
     const barsHeight = laneCount * BAR_H + (laneCount - 1) * LANE_GAP;
     const hasSub = cells.some((c) => c && c.sub);
     const labelMin = row.badge ? LABEL_MIN_H.badge : hasSub ? LABEL_MIN_H.sub : LABEL_MIN_H.plain;
-    const rowHeight = Math.max(barsHeight + ROW_PAD * 2, labelMin);
+    return {
+      row,
+      cells,
+      bars,
+      barsHeight,
+      naturalHeight: Math.max(barsHeight + ROW_PAD * 2, labelMin),
+    };
+  });
+
+  // 줄 수가 제각각이어도 행 높이는 같아야 읽기 편하다 — 가장 높은 행에 맞춘다.
+  const uniformHeight = uniformRows
+    ? prepared.reduce((max, p) => Math.max(max, p.naturalHeight), 0)
+    : 0;
+
+  // 2패스 — 확정된 높이로 그린다.
+  for (const { row, cells, bars, barsHeight, naturalHeight } of prepared) {
+    const rowHeight = uniformRows ? uniformHeight : naturalHeight;
     const barsTop = Math.round((rowHeight - barsHeight) / 2);
 
     const rowEl = el('div', 'gantt__row');
@@ -191,6 +210,25 @@ export function renderGantt({
 
     cols.forEach((col, i) => {
       const cell = cells[i] ?? {};
+
+      // cell.lines 가 있으면 그 열은 레인에 맞춰 여러 줄로 쪼개진다.
+      // 각 줄을 대응하는 바 레인과 같은 y좌표에 절대배치해 세로 정렬을 보장한다
+      // (한 항목이 레인 여러 개를 쓰면 span 만큼 높이를 차지하고 라벨은 한 번만 나온다).
+      if (cell.lines) {
+        const content = cell.lines
+          .map((line) => {
+            const span = line.span ?? 1;
+            const top = barsTop + line.lane * (BAR_H + LANE_GAP);
+            const height = span * BAR_H + (span - 1) * LANE_GAP;
+            return `<span class="gantt__laneline" style="top:${top}px;height:${height}px">
+              <span class="gantt__rowlabel gantt__rowlabel--sub">${escapeHtml(line.text)}</span>
+            </span>`;
+          })
+          .join('');
+        rowEl.appendChild(labelCell(col, i, content, ' gantt__labelcol--lanes'));
+        return;
+      }
+
       const content = `
         ${cell.text ? `<span class="gantt__rowlabel${i > 0 ? ' gantt__rowlabel--sub' : ''}">${escapeHtml(cell.text)}</span>` : ''}
         ${cell.sub ? `<span class="gantt__rowsub">${escapeHtml(cell.sub)}</span>` : ''}
