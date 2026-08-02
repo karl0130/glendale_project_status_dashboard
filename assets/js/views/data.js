@@ -27,7 +27,7 @@ export function render(ctx) {
 // ── 구글 시트 연결 ──────────────────────────────────────────────────────────
 
 function connectionCard(ctx) {
-  const connected = store.source() === 'sheets';
+  const status = store.sheetStatus(); // disconnected | needs-bootstrap | connected
   const card = el('section', 'card');
   card.innerHTML = `
     <header class="card__head">
@@ -39,22 +39,40 @@ function connectionCard(ctx) {
   `;
 
   const body = el('div', 'card__body');
-  body.appendChild(
-    el(
-      'p',
-      `callout${connected ? '' : ' callout--warning'}`,
-      connected
-        ? `<strong>연결됨</strong> · ${escapeHtml(store.account()?.email ?? '')} · 리비전 ${store.revision()}<br>` +
-            '모든 입력이 구글 시트에 바로 저장되고 팀원 화면에도 반영'
-        : '<strong>연결 안 됨</strong> · 지금 입력하는 내용은 이 브라우저에만 저장되고 공유되지 않음<br>' +
-            '우측 상단 <strong>구글 로그인</strong> 버튼으로 연결'
-    )
-  );
-
   const actions = el('div', 'sync-row__actions');
   actions.style.padding = '0 18px 14px';
 
-  if (connected) {
+  const runBootstrap = async () => {
+    if (
+      !confirmDialog(
+        '스프레드시트에 탭과 헤더를 만들고 현재 화면의 데이터를 넣습니다.\n' +
+          '이미 같은 이름의 탭이 있으면 그 내용은 덮어써집니다.\n\n계속할까요?'
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await store.bootstrapSheet();
+      toast(
+        res.created.length ? `시트 초기화 완료 (탭 ${res.created.length}개 생성)` : '시트 초기화 완료',
+        'good'
+      );
+      ctx.rerender();
+    } catch (err) {
+      toast(`초기화 실패 — ${err.message}`, 'warning');
+    }
+  };
+
+  if (status === 'connected') {
+    body.appendChild(
+      el(
+        'p',
+        'callout',
+        `<strong>연결됨</strong> · ${escapeHtml(store.account()?.email ?? '')} · 리비전 ${store.revision()}<br>` +
+          '모든 입력이 구글 시트에 바로 저장되고 팀원 화면에도 반영'
+      )
+    );
+
     const refresh = el('button', 'btn', '시트에서 다시 불러오기');
     refresh.addEventListener('click', async () => {
       try {
@@ -67,20 +85,33 @@ function connectionCard(ctx) {
     });
     actions.appendChild(refresh);
 
-    const init = el('button', 'btn btn--ghost', '시트 초기화 (최초 1회)');
-    init.title = '빈 스프레드시트에 탭과 헤더를 만들고 현재 데이터를 밀어넣습니다';
-    init.addEventListener('click', async () => {
-      if (!confirmDialog('스프레드시트의 탭과 헤더를 만들고 현재 데이터로 덮어씁니다.\n계속할까요?')) return;
-      try {
-        const res = await store.bootstrapSheet();
-        toast(`시트를 초기화했습니다 (탭 ${res.created.length}개 생성)`, 'good');
-        ctx.rerender();
-      } catch (err) {
-        toast(`초기화 실패 — ${err.message}`, 'warning');
-      }
-    });
+    const again = el('button', 'btn btn--ghost', '시트 다시 초기화');
+    again.title = '탭이나 헤더가 망가졌을 때만 사용 — 현재 화면 데이터로 덮어씁니다';
+    again.addEventListener('click', runBootstrap);
+    actions.appendChild(again);
+  } else if (status === 'needs-bootstrap') {
+    const missing = store.missingTabs();
+    body.appendChild(
+      el(
+        'p',
+        'callout callout--warning',
+        '<strong>로그인은 됐지만 시트가 비어 있음</strong> · 아래 버튼을 누르면 탭과 헤더를 만들고 ' +
+          '현재 화면의 데이터를 넣음<br>' +
+          `없는 탭: <code>${missing.map(escapeHtml).join('</code> <code>')}</code>`
+      )
+    );
+    const init = el('button', 'btn btn--primary', '시트 초기화 — 탭 만들고 데이터 넣기');
+    init.addEventListener('click', runBootstrap);
     actions.appendChild(init);
   } else {
+    body.appendChild(
+      el(
+        'p',
+        'callout callout--warning',
+        '<strong>연결 안 됨</strong> · 지금 입력하는 내용은 이 브라우저에만 저장되고 공유되지 않음<br>' +
+          '우측 상단 <strong>구글 로그인</strong> 버튼으로 연결'
+      )
+    );
     const signIn = el('button', 'btn btn--primary', '구글 로그인하고 연결');
     signIn.addEventListener('click', () => ctx.connect({ interactive: true }));
     actions.appendChild(signIn);

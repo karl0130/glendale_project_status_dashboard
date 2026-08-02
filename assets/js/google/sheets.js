@@ -87,6 +87,20 @@ function toMatrix(schema, records) {
   ];
 }
 
+// ── 탭 확인 ─────────────────────────────────────────────────────────────────
+
+/** 스프레드시트에 실제로 존재하는 탭 이름들. */
+export async function listTabs() {
+  const info = await call('?fields=sheets.properties.title');
+  return new Set((info.sheets ?? []).map((s) => s.properties.title));
+}
+
+/** 아직 없는 탭. 하나라도 있으면 읽기 전에 초기화가 필요하다. */
+export function missingTabs(existing) {
+  const wanted = [...Object.values(SCHEMA).map((s) => s.tab), META.tab];
+  return wanted.filter((t) => !existing.has(t));
+}
+
 // ── 읽기 ────────────────────────────────────────────────────────────────────
 
 export async function readAll() {
@@ -175,11 +189,8 @@ export function rememberRowCounts(data) {
 // ── 최초 1회: 빈 시트에 탭과 헤더를 만든다 ──────────────────────────────────
 
 export async function bootstrap(seed) {
-  const info = await call('?fields=sheets.properties.title');
-  const existing = new Set((info.sheets ?? []).map((s) => s.properties.title));
-
-  const wanted = [...Object.values(SCHEMA).map((s) => s.tab), META.tab];
-  const missing = wanted.filter((t) => !existing.has(t));
+  const existing = await listTabs();
+  const missing = missingTabs(existing);
 
   if (missing.length) {
     await call(':batchUpdate', {

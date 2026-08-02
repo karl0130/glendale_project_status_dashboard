@@ -45,6 +45,8 @@ const state = {
   loaded: false,
   saveState: 'idle', // idle | saving | saved | error
   saveError: '',
+  sheetStatus: 'disconnected', // disconnected | needs-bootstrap
+  missingTabs: [],
 };
 
 const listeners = new Set();
@@ -92,15 +94,38 @@ export async function load() {
 
 /**
  * 시트에 연결한다.
+ *
+ * 탭이 아직 없는 빈 스프레드시트일 수 있으므로, 읽기 전에 탭 존재 여부부터 확인한다.
+ * 없으면 sheets 모드로 넘어가지 않는다 — 빈 시트를 원본으로 삼으면 화면이 비어 보이고,
+ * 그 상태에서 뭔가 저장하면 빈 데이터가 시트에 박힌다.
+ *
  * @param {boolean} interactive  true 면 로그인 팝업을 띄운다 (사용자 클릭에서만 호출할 것)
+ * @returns {false | 'needs-bootstrap' | true}
  */
 export async function connect({ interactive = false } = {}) {
   if (!auth.isConfigured()) throw new Error('config.js 에 clientId / spreadsheetId 가 없습니다');
   if (interactive) await auth.signIn();
   else if (!(await auth.restore())) return false;
 
+  const missing = sheets.missingTabs(await sheets.listTabs());
+  if (missing.length) {
+    state.sheetStatus = 'needs-bootstrap';
+    state.missingTabs = missing;
+    emit();
+    return 'needs-bootstrap';
+  }
+
   await pull();
   return true;
+}
+
+export function sheetStatus() {
+  if (state.source === 'sheets') return 'connected';
+  return state.sheetStatus; // disconnected | needs-bootstrap
+}
+
+export function missingTabs() {
+  return state.missingTabs;
 }
 
 /** 시트에서 다시 읽어온다. 로컬 수정분은 버려진다. */
@@ -111,6 +136,8 @@ export async function pull() {
   state.remote = clone(remote);
   state.data = clone(remote);
   state.source = 'sheets';
+  state.sheetStatus = 'connected';
+  state.missingTabs = [];
   sheets.rememberRowCounts(remote);
   localStorage.setItem(LS_KEY, JSON.stringify(state.data)); // 다음 진입 때 즉시 렌더용 캐시
   setSaveState('idle');
@@ -121,6 +148,8 @@ export async function pull() {
 export function disconnect() {
   auth.signOut();
   state.source = 'local';
+  state.sheetStatus = 'disconnected';
+  state.missingTabs = [];
   state.remote = null;
   state.revision = 0;
   setSaveState('idle');

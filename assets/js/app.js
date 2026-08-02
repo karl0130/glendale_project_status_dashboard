@@ -91,12 +91,19 @@ function refreshTopbar() {
 
 async function connect({ interactive = false } = {}) {
   try {
-    const ok = await store.connect({ interactive });
-    if (ok) {
+    const result = await store.connect({ interactive });
+    if (result === 'needs-bootstrap') {
+      // 빈 스프레드시트다. 초기화 화면으로 데려간다 — 여기서 헤매기 딱 좋다.
+      if (interactive) {
+        toast('시트가 비어 있습니다. 초기화가 필요합니다.', 'warning');
+        ctx.navigate('data');
+      }
+      ctx.rerender();
+    } else if (result) {
       toast('구글 시트에 연결되었습니다', 'good');
       ctx.rerender();
     }
-    return ok;
+    return result;
   } catch (err) {
     console.error(err);
     if (interactive) toast(`연결 실패 — ${err.message}`, 'warning');
@@ -143,6 +150,14 @@ function topbar() {
       ctx.rerender();
     });
     meta.appendChild(account);
+  } else if (store.sheetStatus() === 'needs-bootstrap') {
+    const badge = el(
+      'button',
+      'savestate savestate--dirty',
+      '<span class="dot dot--warning" aria-hidden="true"></span>시트 초기화 필요'
+    );
+    badge.addEventListener('click', () => ctx.navigate('data'));
+    meta.appendChild(badge);
   } else {
     if (store.hasLocalChanges()) {
       const badge = el(
