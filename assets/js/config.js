@@ -1,0 +1,54 @@
+// Google 연동 설정.
+//
+// clientId 와 spreadsheetId 는 비밀값이 아니다 — 브라우저에 그대로 노출되는 것이 정상이다.
+// 실제 접근 통제는 두 겹으로 이뤄진다:
+//   1) OAuth 앱이 Internal 이라 회사 Workspace 계정만 로그인된다
+//   2) 스프레드시트의 Drive 공유 권한이 있는 사람만 읽고 쓸 수 있다
+// 따라서 이 값들이 공개 레포에 있어도 외부인은 아무것도 못 본다.
+
+export const GOOGLE = {
+  clientId: '319006066033-nlim9nfk5og7qii0h00242jcnt87oqv9.apps.googleusercontent.com',
+  spreadsheetId: '1KR6pc9w2tyRvYhN-DNkkxPlWOv5Pr3DH9esVpRO6kzY',
+  // userinfo.email 은 로그인한 사람이 employees 의 누구인지 맞추는 데 쓴다.
+  scope: [
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/userinfo.email',
+  ].join(' '),
+};
+
+/**
+ * 탭 구조와 열 정의.
+ *
+ * 읽을 때는 1행의 헤더 이름으로 열을 찾는다 — 시트에서 열 순서를 바꿔도 깨지지 않는다.
+ * 쓸 때는 아래 columns 순서대로 다시 정렬해 내보낸다.
+ */
+export const SCHEMA = {
+  employees: {
+    tab: 'employees',
+    columns: ['id', 'name', 'nameEn', 'role', 'team', 'email', 'active'],
+    types: { active: 'boolean' },
+  },
+  projects: {
+    tab: 'projects',
+    columns: [
+      'id', 'client', 'endClient', 'name', 'status', 'managerId', 'memberIds',
+      'startDate', 'endDate', 'note', 'updatedAt', 'updatedBy',
+    ],
+    types: { memberIds: 'list' },
+  },
+  vacations: {
+    tab: 'vacations',
+    columns: ['id', 'employeeId', 'startDate', 'endDate', 'type', 'note'],
+    types: {},
+  },
+  weeklyUpdates: {
+    tab: 'weekly_updates',
+    columns: ['id', 'employeeId', 'projectId', 'task', 'detail', 'startDate', 'endDate', 'status'],
+    types: {},
+  },
+};
+
+/** 동시 저장 충돌을 잡기 위한 리비전 칸. */
+export const META = { tab: '_meta', revisionCell: 'B1', savedByCell: 'B2', savedAtCell: 'B3' };
+
+export const COLLECTIONS = Object.keys(SCHEMA);

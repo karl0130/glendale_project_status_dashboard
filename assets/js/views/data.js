@@ -18,9 +18,77 @@ const COLLECTIONS = [
 export function render(ctx) {
   const view = el('div', 'view__inner');
   view.appendChild(pageHead());
+  view.appendChild(connectionCard(ctx));
   view.appendChild(syncCard(ctx));
   view.appendChild(archiveCard());
   return view;
+}
+
+// ── 구글 시트 연결 ──────────────────────────────────────────────────────────
+
+function connectionCard(ctx) {
+  const connected = store.source() === 'sheets';
+  const card = el('section', 'card');
+  card.innerHTML = `
+    <header class="card__head">
+      <div class="card__titles">
+        <h2 class="card__title">구글 시트 연결</h2>
+        <p class="card__sub">연결하면 입력이 즉시 팀 전체에 반영</p>
+      </div>
+    </header>
+  `;
+
+  const body = el('div', 'card__body');
+  body.appendChild(
+    el(
+      'p',
+      `callout${connected ? '' : ' callout--warning'}`,
+      connected
+        ? `<strong>연결됨</strong> · ${escapeHtml(store.account()?.email ?? '')} · 리비전 ${store.revision()}<br>` +
+            '모든 입력이 구글 시트에 바로 저장되고 팀원 화면에도 반영'
+        : '<strong>연결 안 됨</strong> · 지금 입력하는 내용은 이 브라우저에만 저장되고 공유되지 않음<br>' +
+            '우측 상단 <strong>구글 로그인</strong> 버튼으로 연결'
+    )
+  );
+
+  const actions = el('div', 'sync-row__actions');
+  actions.style.padding = '0 18px 14px';
+
+  if (connected) {
+    const refresh = el('button', 'btn', '시트에서 다시 불러오기');
+    refresh.addEventListener('click', async () => {
+      try {
+        await store.pull();
+        toast('최신 내용을 불러왔습니다', 'good');
+        ctx.rerender();
+      } catch (err) {
+        toast(`불러오기 실패 — ${err.message}`, 'warning');
+      }
+    });
+    actions.appendChild(refresh);
+
+    const init = el('button', 'btn btn--ghost', '시트 초기화 (최초 1회)');
+    init.title = '빈 스프레드시트에 탭과 헤더를 만들고 현재 데이터를 밀어넣습니다';
+    init.addEventListener('click', async () => {
+      if (!confirmDialog('스프레드시트의 탭과 헤더를 만들고 현재 데이터로 덮어씁니다.\n계속할까요?')) return;
+      try {
+        const res = await store.bootstrapSheet();
+        toast(`시트를 초기화했습니다 (탭 ${res.created.length}개 생성)`, 'good');
+        ctx.rerender();
+      } catch (err) {
+        toast(`초기화 실패 — ${err.message}`, 'warning');
+      }
+    });
+    actions.appendChild(init);
+  } else {
+    const signIn = el('button', 'btn btn--primary', '구글 로그인하고 연결');
+    signIn.addEventListener('click', () => ctx.connect({ interactive: true }));
+    actions.appendChild(signIn);
+  }
+
+  body.appendChild(actions);
+  card.appendChild(body);
+  return card;
 }
 
 function pageHead() {

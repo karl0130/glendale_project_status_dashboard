@@ -2,7 +2,7 @@
 
 import * as store from './store.js';
 import { el, hideTooltip, toast } from './ui.js';
-import { fmtDate, today } from './util.js';
+import { escapeHtml, fmtDate, today } from './util.js';
 import * as overview from './views/overview.js';
 import * as projects from './views/projects.js';
 import * as resources from './views/resources.js';
@@ -56,6 +56,7 @@ const ctx = {
   navigate(id) {
     location.hash = `#/${id}`;
   },
+  connect,
 };
 
 function paint() {
@@ -82,6 +83,28 @@ function paint() {
   app.appendChild(bodyEl);
 }
 
+/** 저장 상태만 바뀌었을 때 화면 전체를 다시 그리면 입력 포커스가 날아간다. 상단만 교체한다. */
+function refreshTopbar() {
+  const old = app.querySelector('.topbar');
+  if (old) old.replaceWith(topbar());
+}
+
+async function connect({ interactive = false } = {}) {
+  try {
+    const ok = await store.connect({ interactive });
+    if (ok) {
+      toast('구글 시트에 연결되었습니다', 'good');
+      ctx.rerender();
+    }
+    return ok;
+  } catch (err) {
+    console.error(err);
+    if (interactive) toast(`연결 실패 — ${err.message}`, 'warning');
+    refreshTopbar();
+    return false;
+  }
+}
+
 function topbar() {
   const bar = el('header', 'topbar');
   bar.innerHTML = `
@@ -96,20 +119,45 @@ function topbar() {
   `;
 
   const meta = bar.querySelector('.topbar__meta');
-  if (store.hasLocalChanges()) {
-    const badge = el(
-      'button',
-      'savestate savestate--dirty',
-      '<span class="dot dot--warning" aria-hidden="true"></span>미반영 변경 있음'
-    );
-    badge.title = '이 브라우저에만 저장된 변경 있음 · 클릭 시 반영 화면으로 이동';
-    badge.addEventListener('click', () => ctx.navigate('data'));
-    meta.appendChild(badge);
+
+  if (store.source() === 'sheets') {
+    const { status, message } = store.saveState();
+    const chip = el('span', `savestate savestate--${status}`);
+    const text = {
+      idle: '시트 연결됨',
+      saving: '저장 중…',
+      saved: '저장됨',
+      error: '저장 실패',
+    }[status];
+    const tone = { saving: 'warning', saved: 'good', error: 'critical', idle: 'good' }[status];
+    chip.innerHTML = `<span class="dot dot--${tone}" aria-hidden="true"></span>${escapeHtml(text)}`;
+    if (status === 'error') chip.title = message;
+    meta.appendChild(chip);
+
+    const who = store.account()?.email ?? '';
+    const account = el('button', 'savestate', escapeHtml(who || '로그아웃'));
+    account.title = '클릭하면 연결을 끊습니다 (로컬 저장으로 전환)';
+    account.addEventListener('click', () => {
+      store.disconnect();
+      toast('연결을 끊었습니다. 이제 변경사항은 이 브라우저에만 저장됩니다.', 'info');
+      ctx.rerender();
+    });
+    meta.appendChild(account);
   } else {
-    meta.appendChild(
-      el('span', 'savestate', '<span class="dot dot--good" aria-hidden="true"></span>레포와 동일')
-    );
+    if (store.hasLocalChanges()) {
+      const badge = el(
+        'span',
+        'savestate savestate--dirty',
+        '<span class="dot dot--warning" aria-hidden="true"></span>이 브라우저에만 저장됨'
+      );
+      meta.appendChild(badge);
+    }
+    const signIn = el('button', 'savestate savestate--action', '구글 로그인');
+    signIn.title = '구글 시트에 연결하면 입력이 팀 전체에 공유됩니다';
+    signIn.addEventListener('click', () => connect({ interactive: true }));
+    meta.appendChild(signIn);
   }
+
   return bar;
 }
 
@@ -154,13 +202,15 @@ function navGroup(title, routes, active) {
 window.addEventListener('hashchange', paint);
 window.addEventListener('scroll', hideTooltip, true);
 
+// 저장 상태 표시만 갱신한다. 전체 리렌더는 각 화면이 직접 요청한다.
+store.subscribe(refreshTopbar);
+
 store
   .load()
   .then(() => {
     paint();
-    if (store.hasLocalChanges()) {
-      toast('이 브라우저에 저장된 변경사항 불러옴', 'info');
-    }
+    // 캐시로 먼저 그린 뒤, 세션이 살아 있으면 조용히 시트에 붙어 최신 값으로 교체한다.
+    connect({ interactive: false });
   })
   .catch((err) => {
     console.error(err);

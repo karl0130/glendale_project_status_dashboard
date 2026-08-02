@@ -231,6 +231,22 @@ button.savestate:hover {
   border-color: rgba(250, 178, 25, 0.55);
   color: #ffdf9e;
 }
+/* 로그인 버튼은 상단에서 유일하게 눌러야 하는 것이라 한 단계 밝게 둔다. */
+.savestate--action {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: transparent;
+  color: var(--brand-700);
+  font-weight: 700;
+}
+.savestate--action:hover {
+  background: #ffffff;
+}
+.savestate--error {
+  background: rgba(208, 59, 59, 0.24);
+  border-color: rgba(208, 59, 59, 0.6);
+  color: #ffd4d4;
+  cursor: help;
+}
 
 .dot {
   width: 7px;

@@ -1,12 +1,16 @@
 // 데이터 스토어.
 //
-// 저장 구조는 2계층이다:
-//   1) data/*.json  — 레포에 커밋된 "공식" 데이터. 모두가 보는 값.
-//   2) localStorage — 이 브라우저에서 입력/수정한 값이 위에 덮어씌워진다.
+// 데이터 출처는 두 가지다.
 //
-// GitHub Pages에는 서버가 없으므로 브라우저의 입력이 저절로 공유되지는 않는다.
-// 공유하려면 '데이터 관리' 화면에서 JSON을 내보내 data/ 아래에 커밋해야 한다.
+//   local   — 구글 로그인 전. data/*.json 을 읽고 수정분은 localStorage 에만 쌓인다.
+//             다른 사람에게 공유되지 않는다.
+//   sheets  — 구글 로그인 후. Google Sheets 가 유일한 원본이고, 저장하면 즉시 팀에 반영된다.
+//
+// 화면 코드는 이 차이를 몰라도 된다. all / byId / upsert / remove 만 쓰면 된다.
 
+import * as auth from './google/auth.js';
+import * as sheets from './google/sheets.js';
+import { COLLECTIONS } from './config.js';
 import { byKo, parseDate, toISO, today } from './util.js';
 
 const SOURCES = {
@@ -33,9 +37,14 @@ export const ACTIVE_STATUSES = ['수주', '수행중'];
 const LS_KEY = 'glendale-dashboard/v1';
 
 const state = {
-  base: null, // 서버(레포) 원본
-  data: null, // 로컬 수정이 반영된 현재 값
+  source: 'local', // local | sheets
+  base: null, // 레포에 커밋된 원본 (local 모드의 기준선)
+  remote: null, // 시트에서 마지막으로 읽은 값 (sheets 모드의 기준선)
+  data: null, // 화면이 보고 있는 현재 값
+  revision: 0,
   loaded: false,
+  saveState: 'idle', // idle | saving | saved | error
+  saveError: '',
 };
 
 const listeners = new Set();
@@ -53,6 +62,8 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+// ── 로드 ────────────────────────────────────────────────────────────────────
+
 export async function load() {
   const entries = await Promise.all(
     Object.entries(SOURCES).map(async ([key, path]) => {
@@ -68,11 +79,10 @@ export async function load() {
   if (raw) {
     try {
       const local = JSON.parse(raw);
-      for (const key of Object.keys(SOURCES)) {
+      for (const key of COLLECTIONS) {
         if (Array.isArray(local[key])) state.data[key] = local[key];
       }
     } catch {
-      // 손상된 로컬 데이터는 조용히 버리고 서버 값으로 진행한다.
       localStorage.removeItem(LS_KEY);
     }
   }
@@ -80,10 +90,111 @@ export async function load() {
   emit();
 }
 
+/**
+ * 시트에 연결한다.
+ * @param {boolean} interactive  true 면 로그인 팝업을 띄운다 (사용자 클릭에서만 호출할 것)
+ */
+export async function connect({ interactive = false } = {}) {
+  if (!auth.isConfigured()) throw new Error('config.js 에 clientId / spreadsheetId 가 없습니다');
+  if (interactive) await auth.signIn();
+  else if (!(await auth.restore())) return false;
+
+  await pull();
+  return true;
+}
+
+/** 시트에서 다시 읽어온다. 로컬 수정분은 버려진다. */
+export async function pull() {
+  const remote = await sheets.readAll();
+  state.revision = remote.revision;
+  delete remote.revision;
+  state.remote = clone(remote);
+  state.data = clone(remote);
+  state.source = 'sheets';
+  sheets.rememberRowCounts(remote);
+  localStorage.setItem(LS_KEY, JSON.stringify(state.data)); // 다음 진입 때 즉시 렌더용 캐시
+  setSaveState('idle');
+  emit();
+  return remote;
+}
+
+export function disconnect() {
+  auth.signOut();
+  state.source = 'local';
+  state.remote = null;
+  state.revision = 0;
+  setSaveState('idle');
+  emit();
+}
+
+export function source() {
+  return state.source;
+}
+
+export function account() {
+  return auth.currentAccount();
+}
+
+export function isSignedIn() {
+  return auth.isSignedIn();
+}
+
+export function revision() {
+  return state.revision;
+}
+
+// ── 저장 상태 ───────────────────────────────────────────────────────────────
+
+function setSaveState(next, message = '') {
+  state.saveState = next;
+  state.saveError = message;
+  emit();
+}
+
+export function saveState() {
+  return { status: state.saveState, message: state.saveError };
+}
+
+/** 저장 요청이 겹쳐도 순서대로 처리되도록 직렬화한다. */
+let chain = Promise.resolve();
+
+function enqueue(task) {
+  const run = chain.then(task, task);
+  chain = run.catch(() => {});
+  return run;
+}
+
+function pushCollection(key) {
+  return enqueue(async () => {
+    setSaveState('saving');
+    try {
+      state.revision = await sheets.writeCollection(
+        key,
+        state.data[key],
+        state.revision,
+        auth.currentAccount()?.email ?? ''
+      );
+      state.remote[key] = clone(state.data[key]);
+      setSaveState('saved');
+    } catch (err) {
+      setSaveState('error', err.message);
+    }
+  });
+}
+
+/** 빈 스프레드시트에 탭·헤더를 만들고 현재 데이터를 밀어넣는다 (최초 1회). */
+export async function bootstrapSheet() {
+  const result = await sheets.bootstrap(state.data);
+  await pull();
+  return result;
+}
+
 function persist() {
   localStorage.setItem(LS_KEY, JSON.stringify(state.data));
   emit();
 }
+
+// ── 조회 · 변경 ─────────────────────────────────────────────────────────────
 
 export function all(collection) {
   return state.data?.[collection] ?? [];
@@ -99,24 +210,31 @@ export function upsert(collection, record) {
   if (index >= 0) list[index] = { ...list[index], ...record };
   else list.push(record);
   persist();
+  if (state.source === 'sheets') pushCollection(collection);
   return record;
 }
 
 export function remove(collection, id) {
   state.data[collection] = state.data[collection].filter((row) => row.id !== id);
   persist();
+  if (state.source === 'sheets') pushCollection(collection);
+}
+
+// ── 변경 감지 · 내보내기 (local 모드에서 쓰는 기능) ─────────────────────────
+
+function baseline() {
+  return state.source === 'sheets' ? state.remote : state.base;
 }
 
 export function hasLocalChanges() {
-  if (!state.loaded) return false;
-  return JSON.stringify(state.base) !== JSON.stringify(state.data);
+  if (!state.loaded || !baseline()) return false;
+  return JSON.stringify(baseline()) !== JSON.stringify(state.data);
 }
 
 export function changedCollections() {
-  if (!state.loaded) return [];
-  return Object.keys(SOURCES).filter(
-    (key) => JSON.stringify(state.base[key]) !== JSON.stringify(state.data[key])
-  );
+  const ref = baseline();
+  if (!state.loaded || !ref) return [];
+  return COLLECTIONS.filter((key) => JSON.stringify(ref[key]) !== JSON.stringify(state.data[key]));
 }
 
 export function exportJSON(collection) {
@@ -128,10 +246,12 @@ export function importJSON(collection, text) {
   if (!Array.isArray(parsed)) throw new Error('최상위가 배열인 JSON이어야 합니다.');
   state.data[collection] = parsed;
   persist();
+  if (state.source === 'sheets') pushCollection(collection);
 }
 
 export function resetToRepo() {
   state.data = clone(state.base);
+  state.source = 'local';
   localStorage.removeItem(LS_KEY);
   emit();
 }
@@ -144,6 +264,13 @@ export function employees() {
 
 export function employeeName(id) {
   return byId('employees', id)?.name ?? '—';
+}
+
+/** 로그인한 구글 계정에 해당하는 직원. employees 의 email 열로 맞춘다. */
+export function currentEmployee() {
+  const email = auth.currentAccount()?.email;
+  if (!email) return null;
+  return employees().find((e) => (e.email || '').toLowerCase() === email) ?? null;
 }
 
 export function projects() {
@@ -163,7 +290,6 @@ export function projectMembers(project) {
 /**
  * 프로젝트 → 색상 슬롯(1..8).
  * 색은 "프로젝트라는 개체"를 따라가며 화면·필터가 바뀌어도 절대 재배정하지 않는다.
- * (필터 결과 순서로 색을 주면 읽는 사람이 학습한 색-프로젝트 연결이 깨진다.)
  * id 순으로 고정 배정하고, 9개째부터는 색을 새로 만들지 않고 중립 회색으로 접는다.
  */
 let colorMap = null;
@@ -228,7 +354,6 @@ export function updatesInRange(start, end) {
 
 /**
  * Resource planning의 원천. 별도 입력 없이 Project status 표에서 자동 산출한다.
- * 한 사람이 같은 날 2개 이상 프로젝트에 물려 있으면 overlap으로 표시된다.
  */
 export function assignments(statuses = ACTIVE_STATUSES) {
   const out = [];
