@@ -14,7 +14,7 @@ import {
   toISO,
   uid,
 } from '../util.js';
-import { projectTooltip } from './overview.js';
+import { barLabel, projectTooltip } from './overview.js';
 
 let anchor = null;
 const filters = { status: 'all', q: '' };
@@ -67,7 +67,7 @@ export function render(ctx) {
               {
                 start: p.startDate,
                 end: p.endDate,
-                label: p.name,
+                label: barLabel(p),
                 color: store.projectColor(p.id),
                 tooltip: projectTooltip(p),
                 aria: `${p.client} ${p.name}, ${fmtRange(p.startDate, p.endDate)}`,

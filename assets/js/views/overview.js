@@ -16,6 +16,7 @@ import {
   subtractRanges,
   today,
   weekLabel,
+  weekSpan,
   workdayCount,
 } from '../util.js';
 
@@ -164,6 +165,16 @@ export function projectTooltip(p) {
     </dl>`;
 }
 
+/**
+ * 프로젝트 바 라벨 — 이름 뒤에 전체 기간을 주 단위로 붙인다.
+ * 화면에 보이는 구간이 아니라 프로젝트 전체 길이라서, 2주·4주 어느 구간을 보고 있어도
+ * 같은 값이 나온다.
+ */
+export function barLabel(p) {
+  const weeks = weekSpan(p.startDate, p.endDate);
+  return weeks ? `${p.name} (${weeks}w)` : p.name;
+}
+
 export function vacationTooltip(name, block) {
   return `<strong>${escapeHtml(name)} — ${escapeHtml(block.type)}</strong>
     <dl class="tooltip__list">
@@ -185,7 +196,7 @@ function ongoingProjects(start, end, nav) {
       {
         start: p.startDate,
         end: p.endDate,
-        label: p.name,
+        label: barLabel(p),
         color: store.projectColor(p.id),
         tooltip: projectTooltip(p),
         aria: `${p.client} ${p.name}, ${fmtRange(p.startDate, p.endDate)}`,

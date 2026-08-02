@@ -105,6 +105,17 @@ export function workdayCount(start, end) {
   return eachDay(start, end).filter((d) => !isWeekend(d)).length;
 }
 
+/**
+ * 프로젝트 전체 기간이 몇 주에 걸치는지. 시작·종료일을 모두 포함해 세고 올림한다.
+ * (화면에 보이는 구간이 아니라 프로젝트 전체 길이 기준)
+ */
+export function weekSpan(startIso, endIso) {
+  const s = parseDate(startIso);
+  const e = parseDate(endIso);
+  if (!s || !e || e < s) return null;
+  return Math.ceil((diffDays(s, e) + 1) / 7);
+}
+
 export function fmtMD(date) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
